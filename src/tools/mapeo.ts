@@ -80,3 +80,23 @@ export function valoresPorEtiqueta(mapeo: Mapeo): Map<string, unknown> {
   for (const c of mapeo.requiere_confirmacion) valores.set(c.etiqueta, c.valor)
   return valores
 }
+
+// Datos bancarios: el modelo no necesita verlos, así que no se le envían completos (RN2).
+// Solo el archivo generado lleva el valor real.
+const RUTAS_SENSIBLES = /^banco\./
+
+function enmascarar(valor: unknown): string {
+  const texto = String(valor)
+  return texto.length > 4 ? `***${texto.slice(-4)}` : "***"
+}
+
+// Devuelve una copia del mapeo apta para enviar al modelo.
+export function ocultarSensibles(mapeo: Mapeo): Mapeo {
+  const ocultar = <T extends { ruta: string; valor: unknown }>(item: T): T =>
+    RUTAS_SENSIBLES.test(item.ruta) ? { ...item, valor: enmascarar(item.valor) } : item
+  return {
+    llenos: mapeo.llenos.map(ocultar),
+    faltantes: mapeo.faltantes,
+    requiere_confirmacion: mapeo.requiere_confirmacion.map(ocultar),
+  }
+}

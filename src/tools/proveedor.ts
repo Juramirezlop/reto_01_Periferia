@@ -16,13 +16,14 @@ import {
   nombreCaso,
 } from "./datos"
 import { generarPdf, generarValoresPortal, generarXlsx } from "./formularios"
-import { esAmbigua, ID_TRIBUTARIO, type Mapeo, mapearCampos, valoresPorEtiqueta } from "./mapeo"
+import { esAmbigua, ID_TRIBUTARIO, type Mapeo, mapearCampos, ocultarSensibles, valoresPorEtiqueta } from "./mapeo"
 import {
   type Ctx,
   definirHerramienta,
   ErrorHerramienta,
   fechaEjecucion,
   leerJson,
+  MENSAJE_SIN_CONFIRMACION,
   obtenerPorRuta,
   rutaOutCaso,
   rutasBase,
@@ -149,7 +150,7 @@ export const mapear_campos = definirHerramienta({
     const mapeo = mapearCampos(campos, solicitud.pais, glosario, maestro)
 
     return {
-      data: { llenos: mapeo.llenos, faltantes: mapeo.faltantes, requiere_confirmacion: mapeo.requiere_confirmacion },
+      data: ocultarSensibles(mapeo), // al modelo no se le envían datos bancarios completos
       resumen: `${mapeo.llenos.length} llenos, ${mapeo.faltantes.length} faltantes, ${mapeo.requiere_confirmacion.length} por confirmar.`,
     }
   },
@@ -333,7 +334,7 @@ export const simular_envio = definirHerramienta({
       .describe("true solo si el usuario confirmó explícitamente el envío en su mensaje inmediatamente anterior"),
   },
   async run({ caso, confirmado }, ctx) {
-    if (!confirmado) throw new ErrorHerramienta("requiere confirmación explícita")
+    if (!confirmado) throw new ErrorHerramienta(MENSAJE_SIN_CONFIRMACION)
 
     const solicitud = await cargarSolicitud(ctx, caso)
     const carpetaCaso = rutaOutCaso(ctx, caso)

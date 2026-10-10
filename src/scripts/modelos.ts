@@ -1,8 +1,8 @@
 // Lista los modelos de Gemini que puede usar tu clave y, si le pasas uno, lo prueba
 // con una herramienta (que es lo que hará el agente).
 //
-//   bun run modelos                    -> lista los modelos disponibles
-//   bun run modelos gemini-xxxx        -> prueba ese modelo 3 veces: velocidad y llamada a herramienta
+//   bun run modelos                         -> lista los modelos disponibles
+//   bun run modelos gemini-a gemini-b ...   -> prueba cada modelo 3 veces: velocidad y llamada a herramienta
 import { z } from "zod"
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta"
@@ -75,10 +75,10 @@ async function listarModelos(): Promise<void> {
 
   console.log(`Modelos Gemini disponibles para tu clave (${encontrados.length}):\n`)
   for (const linea of encontrados.sort()) console.log(`  ${linea}`)
-  console.log("\nPrueba uno con:  bun run modelos <nombre-del-modelo>")
+  console.log("\nPrueba varios con:  bun run modelos <modelo-1> <modelo-2> ...")
 }
 
-// ---------- Modo 2: probar un modelo con una herramienta ----------
+// ---------- Modo 2: probar modelos con una herramienta ----------
 
 const EsquemaRespuesta = z.object({
   candidates: z
@@ -120,12 +120,15 @@ async function probarModelo(nombre: string): Promise<void> {
     ],
   }
 
-  console.log(`Probando ${modelo} (3 llamadas seguidas)...\n`)
+  console.log(`\n${modelo}`)
+  const tiempos: number[] = []
+  let conHerramienta = 0
+
   for (let i = 1; i <= 3; i++) {
     const { estado, json, ms } = await llamar(`/models/${modelo}:generateContent`, cuerpo)
     if (estado !== 200) {
-      console.log(`  #${i}: error ${estado} en ${ms} ms -> ${mensajeDeError(json)}`)
-      if (estado === 404) console.log("       Ese modelo no existe para tu clave. Ejecuta sin argumento para ver la lista.")
+      console.log(`  #${i}: error ${estado} en ${ms} ms -> ${mensajeDeError(json).slice(0, 160)}`)
+      if (estado === 404) console.log("       No disponible para tu clave (puede estar retirado para cuentas nuevas). Elige otro de la lista.")
       if (estado === 429) console.log("       Límite de uso alcanzado (cuota o peticiones por minuto del nivel gratuito).")
       continue
     }
@@ -135,11 +138,21 @@ async function probarModelo(nombre: string): Promise<void> {
       ? `llamó a la herramienta ${llamada.name}(${JSON.stringify(llamada.args ?? {})})`
       : `NO llamó a la herramienta; respondió texto: ${partes.map((p) => p.text ?? "").join("").slice(0, 80)}`
     console.log(`  #${i}: OK en ${ms} ms -> ${resultado}`)
+    tiempos.push(ms)
+    if (llamada) conHerramienta++
   }
+
+  // Tiempo típico = la mediana de las respuestas que sí llegaron.
+  const ordenados = [...tiempos].sort((a, b) => a - b)
+  const tipico = ordenados.length > 0 ? `${ordenados[Math.floor(ordenados.length / 2)]} ms` : "sin datos"
+  console.log(`  Resumen: ${tiempos.length}/3 respuestas, ${conHerramienta}/3 con herramienta, tiempo típico ${tipico}`)
 }
 
 // ---------- Programa principal ----------
 
-const modeloPedido = process.argv[2]
-if (modeloPedido) await probarModelo(modeloPedido)
-else await listarModelos()
+const modelosPedidos = process.argv.slice(2)
+if (modelosPedidos.length > 0) {
+  for (const modelo of modelosPedidos) await probarModelo(modelo)
+} else {
+  await listarModelos()
+}

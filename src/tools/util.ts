@@ -10,6 +10,9 @@ export type Ctx = { directory: string; sessionId: string }
 // Error "esperado": lleva un mensaje claro para la analista, sin traza.
 export class ErrorHerramienta extends Error {}
 
+// Mensaje exacto que pide el PRD cuando se intenta enviar sin confirmar.
+export const MENSAJE_SIN_CONFIRMACION = "requiere confirmación explícita"
+
 // Lo que devuelve la lógica de cada herramienta cuando todo sale bien.
 export type Resultado = { data: unknown; resumen: string }
 

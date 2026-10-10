@@ -3,18 +3,30 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "bun run src/server.ts",
+    "chat": "bun run src/scripts/chat.ts",
     "demo": "bun run demo.ts",
     "modelos": "bun run src/scripts/modelos.ts",
-    "typecheck": "tsc --noEmit"
+    "test": "bun test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "dev": "vite",
+    "build:web": "vite build"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
     "pdfkit": "^0.20.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
     "@types/pdfkit": "^0.17.6",
-    "typescript": "^7.0.2"
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
   }
 }
