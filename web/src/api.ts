@@ -7,6 +7,7 @@ export type VistaCaso = {
   solicitud: { pais: string; cliente: string; formato: string; campos: { etiqueta: string; obligatorio?: boolean }[]; soportes: string[] }
   mapeo: { llenos: Lleno[]; faltantes: Faltante[]; requiere_confirmacion: PorConfirmar[] }
   estado: { listo_para_firma: boolean; bloqueos: string[]; etapa: string } | null // null = paquete sin armar
+  obsoleto: boolean // el estado se calculó con otra fecha de ejecución
   archivos: string[]
 }
 

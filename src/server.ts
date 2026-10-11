@@ -33,7 +33,9 @@ Bun.serve({
       const mapeo = JSON.parse(await ejecutar("proveedor_mapear_campos", { caso: caso.data, campos: etiquetas }, ctx, false))
       const estado = await Bun.file(join(rutaOutCaso(ctx, caso.data), "estado.json")).json().catch(() => null)
       const archivos = await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: join(rutaOutCaso(ctx, caso.data), "paquete") })).catch(() => [])
-      return json({ solicitud: leida.data, mapeo: mapeo.data, estado, archivos })
+      // Un estado calculado con otra fecha de ejecución ya no es confiable: el panel pide reprocesar.
+      const obsoleto = estado !== null && estado.fecha !== fechaEjecucion()
+      return json({ solicitud: leida.data, mapeo: mapeo.data, estado, obsoleto, archivos })
     }
 
     // Descarga de un archivo generado, siempre dentro de out/<caso>/

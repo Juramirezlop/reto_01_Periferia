@@ -18,7 +18,7 @@ export function Expediente({ caso, vista }: { caso: string; vista: VistaCaso }) 
     return { c, tipo: "falta", valor: "—", nota: falta?.motivo ?? "" }
   })
 
-  const sello = !estado ? { clase: "sin-armar", texto: "Paquete sin armar" } : estado.listo_para_firma ? { clase: "listo", texto: estado.etapa === "firma" ? "Listo para firma" : "Listo para portal" } : { clase: "bloqueado", texto: "Bloqueado" }
+  const sello = vista.obsoleto ? { clase: "sin-armar", texto: "Reprocesar" } : !estado ? { clase: "sin-armar", texto: "Paquete sin armar" } : estado.listo_para_firma ? { clase: "listo", texto: estado.etapa === "firma" ? "Listo para firma" : "Listo para portal" } : { clase: "bloqueado", texto: "Bloqueado" }
 
   return (
     <div className="expediente">
@@ -29,6 +29,8 @@ export function Expediente({ caso, vista }: { caso: string; vista: VistaCaso }) 
 
       {/* key = clase: al cambiar de estado el sello se vuelve a estampar */}
       <div key={sello.clase + caso} className={`sello ${sello.clase}`}>{sello.texto}</div>
+
+      {vista.obsoleto && <p className="aviso">Este estado se calculó con otra fecha de ejecución. Pídele al agente que procese el caso otra vez.</p>}
 
       <div className="barra-campos" role="img" aria-label={`${llenos.length} llenos, ${confirmar.length} por confirmar, ${faltantes.length} faltantes`}>
         <span className="b-lleno" style={{ flex: llenos.length }} />

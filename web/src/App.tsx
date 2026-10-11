@@ -73,7 +73,7 @@ export function App() {
           <ul className="lista-casos">
             {casos.map((c) => {
               const v = vistas[c]
-              const estado = !v ? "cargando" : !v.estado ? "sin-armar" : v.estado.listo_para_firma ? "listo" : "bloqueado"
+              const estado = !v ? "cargando" : !v.estado || v.obsoleto ? "sin-armar" : v.estado.listo_para_firma ? "listo" : "bloqueado"
               return (
                 <li key={c}>
                   <button className={`caso ${c === activo ? "activo" : ""}`} onClick={() => { setActivo(c); setVista("expediente") }}>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import Markdown from "react-markdown"
 import type { VistaCaso } from "./api"
+import { Frontera } from "./Frontera"
 
 export type Mensaje = { rol: "usuario" | "agente"; texto: string; herramientas?: { nombre: string; ok: boolean }[]; error?: boolean }
 
@@ -25,7 +26,10 @@ export function Chat(props: {
 }) {
   const [texto, setTexto] = useState("")
   const fin = useRef<HTMLDivElement>(null)
-  useEffect(() => fin.current?.scrollIntoView({ behavior: "smooth" }), [props.mensajes, props.trabajando])
+  useEffect(() => {
+    // Con llaves: un efecto no debe devolver nada (si devuelve algo que no es una función, React falla).
+    fin.current?.scrollIntoView({ behavior: "smooth" })
+  }, [props.mensajes, props.trabajando])
 
   // Atajos según el caso elegido. "Confirmar envío" solo se habilita si el paquete está listo.
   const listo = props.vista?.estado?.listo_para_firma === true
@@ -56,7 +60,14 @@ export function Chat(props: {
         )}
         {props.mensajes.map((m, i) => (
           <article key={i} className={`mensaje ${m.rol}${m.error ? " error" : ""}`}>
-            {m.rol === "agente" ? <Markdown>{m.texto}</Markdown> : <p>{m.texto}</p>}
+            {m.rol === "agente" ? (
+              // Si el formato Markdown fallara con algún texto, se muestra tal cual.
+              <Frontera alternativa={() => <p style={{ whiteSpace: "pre-wrap" }}>{m.texto}</p>}>
+                <Markdown>{m.texto}</Markdown>
+              </Frontera>
+            ) : (
+              <p>{m.texto}</p>
+            )}
             {m.herramientas && m.herramientas.length > 0 && (
               <ol className="traza">
                 {m.herramientas.map((h, j) => (

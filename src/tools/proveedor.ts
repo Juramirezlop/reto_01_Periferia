@@ -104,6 +104,7 @@ const EsquemaEstadoPaquete = z.object({
   listo_para_firma: z.boolean(),
   bloqueos: z.array(z.string()),
   etapa: z.string(), // "firma" o "carga en portal"
+  fecha: z.string().optional(), // fecha de ejecución con la que se calculó (para detectar estados viejos)
 })
 
 // ---------- Herramienta 1 (HU-1): leer la solicitud ----------
@@ -300,7 +301,7 @@ export const armar_paquete = definirHerramienta({
     await writeFile(join(carpetaPaquete, "borrador-correo.md"), correo, "utf8")
 
     // Estado para que proveedor_simular_envio sepa cómo quedó el paquete.
-    await writeFile(join(carpetaCaso, "estado.json"), JSON.stringify({ listo_para_firma: listo, bloqueos, etapa }, null, 2), "utf8")
+    await writeFile(join(carpetaCaso, "estado.json"), JSON.stringify({ listo_para_firma: listo, bloqueos, etapa, fecha: fechaEjecucion() }, null, 2), "utf8")
 
     return {
       data: {

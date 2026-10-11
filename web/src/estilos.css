@@ -118,6 +118,7 @@ button { cursor: pointer; }
 .sello.sin-armar { border-style: dashed; color: var(--gris); border-color: var(--gris); }
 @keyframes estampa { from { transform: rotate(-10deg) scale(1.8); opacity: 0; } }
 
+.aviso { margin: 0; padding: 8px 10px; border: 1.5px dashed var(--tinta); border-radius: 6px; font-size: 13px; background: var(--lavanda-clara); }
 .barra-campos { display: flex; height: 12px; border: var(--linea); border-radius: 3px; overflow: hidden; }
 .barra-campos span { transition: flex .4s; }
 .b-lleno { background: var(--tinta); }
@@ -162,3 +163,7 @@ button { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.falla-pantalla { max-width: 560px; margin: 10vh auto; padding: 20px; background: var(--papel); border: var(--linea); border-radius: 10px; box-shadow: 6px 6px 0 var(--tinta); }
+.falla-pantalla pre { white-space: pre-wrap; font: 400 12px/1.4 var(--mono); }
+.falla-pantalla button { padding: 8px 16px; background: var(--tinta); color: var(--papel); border: 0; border-radius: 999px; }
