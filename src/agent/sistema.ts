@@ -14,9 +14,12 @@ export async function construirSistema(ctx: Ctx): Promise<string> {
   return `${prompt}\n\n${conocimiento}\n\nFecha de ejecución: ${fechaEjecucion()}\nCasos disponibles: ${casos}`
 }
 
-// ¿El último mensaje del usuario confirma el envío? Conservador: cualquier "no" lo anula.
-export function confirmaEnvio(texto: string): boolean {
+// ¿El mensaje de la analista confirma el envío? Conservador: cualquier "no" lo anula.
+// Un "sí" suelto solo vale si lo último que dijo el agente fue pedir confirmación.
+export function confirmaEnvio(texto: string, ultimoDelAgente = ""): boolean {
   const t = texto.toLowerCase()
   if (/\bno\b/.test(t)) return false
-  return /\b(confirmo|confirmado|confirmada|env[ií]alo|env[ií]ala|adelante|s[ií],? env[ií]a)\b/.test(t)
+  if (/\b(confirmo|confirmado|confirmada|env[ií]alo|env[ií]ala|adelante|s[ií],? env[ií]a)\b/.test(t)) return true
+  // (?![a-z...]) en lugar de \b: \b no se lleva bien con letras con tilde como la í de "sí".
+  return /^\s*(s[ií]|ok|dale|de acuerdo)(?![a-záéíóúñ])/.test(t) && /confirm/i.test(ultimoDelAgente)
 }

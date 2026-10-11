@@ -75,7 +75,7 @@ export function crearGemini(opciones: { apiKey: string; modelo: string; timeoutM
         throw new ErrorModelo(`${opciones.modelo}: HTTP ${respuesta.status} ${detalle}`, respuesta.status === 429 || respuesta.status >= 500)
       }
 
-      const json = (await respuesta.json()) as { candidates?: { content?: Contenido }[] }
+      const json = (await respuesta.json()) as { candidates?: { content?: Contenido }[]; usageMetadata?: { totalTokenCount?: number } }
       const contenido = json.candidates?.[0]?.content
       if (!contenido?.parts) throw new ErrorModelo(`${opciones.modelo}: respuesta vacía`, true)
 
@@ -84,7 +84,7 @@ export function crearGemini(opciones: { apiKey: string; modelo: string; timeoutM
         const f = p.functionCall as { name: string; args?: unknown } | undefined
         return f ? [{ nombre: f.name, args: f.args ?? {} }] : []
       })
-      return { texto, llamadas, crudo: { role: "model", parts: contenido.parts } }
+      return { texto, llamadas, crudo: { role: "model", parts: contenido.parts }, tokens: json.usageMetadata?.totalTokenCount }
     },
   }
 }

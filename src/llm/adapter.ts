@@ -18,7 +18,7 @@ export type Entrada =
   | { tipo: "modelo"; texto: string; llamadas: Llamada[]; crudo?: unknown }
   | { tipo: "resultado"; nombre: string; contenido: string }
 
-export type RespuestaModelo = { texto: string; llamadas: Llamada[]; crudo?: unknown }
+export type RespuestaModelo = { texto: string; llamadas: Llamada[]; crudo?: unknown; tokens?: number }
 
 export type Adaptador = {
   generar(entrada: { sistema: string; historial: Entrada[]; herramientas: DeclaracionHerramienta[] }): Promise<RespuestaModelo>

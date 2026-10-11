@@ -1,5 +1,9 @@
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { cp } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { beforeAll, describe, expect, test } from "bun:test"
-import { responder } from "../agent/loop"
+import { responder, type Sesion } from "../agent/loop"
 import { ejecutar } from "../agent/herramientas"
 import { confirmaEnvio } from "../agent/sistema"
 import { ErrorModelo, type Adaptador, type Entrada, type Llamada } from "../llm/adapter"
@@ -16,8 +20,8 @@ function guion(...turnos: { texto?: string; llamadas?: Llamada[] }[]): Adaptador
   return { generar: async () => ({ texto: turnos[i]?.texto ?? "", llamadas: turnos[i++]?.llamadas ?? [] }) }
 }
 const llamar = (nombre: string, args: unknown): Llamada => ({ nombre, args })
-const correr = (adaptadores: Adaptador[], mensaje: string, historial: Entrada[] = []) =>
-  responder({ adaptadores, sistema: "prueba", historial, mensaje, ctx })
+const correr = (adaptadores: Adaptador[], mensaje: string, sesion: Sesion = { historial: [], tokens: 0 }, limites = { maxPasos: 8, maxTokens: 1000 }) =>
+  responder({ adaptadores, sistema: "prueba", sesion, limites, mensaje, ctx })
 
 describe("ciclo del agente", () => {
   test("ejecuta herramientas pedidas por el modelo y responde", async () => {
@@ -39,6 +43,25 @@ describe("ciclo del agente", () => {
     await ejecutar("proveedor_armar_paquete", { caso: "co-industrias-delta" }, ctx, false) // el envío exige paquete armado
     const r = await ejecutar("proveedor_simular_envio", { caso: "co-industrias-delta" }, ctx, true)
     expect(JSON.parse(r).ok).toBe(true)
+  })
+
+  test("un \"sí\" solo confirma si el agente acababa de pedir confirmación", () => {
+    expect(confirmaEnvio("sí", "¿Confirmas el envío?")).toBe(true)
+    expect(confirmaEnvio("sí", "Aquí tienes el resumen.")).toBe(false)
+    expect(confirmaEnvio("no, espera", "¿Confirmas el envío?")).toBe(false)
+  })
+
+  test("el tope de tokens por sesión detiene el ciclo antes de llamar al modelo", async () => {
+    const modelo: Adaptador = { generar: async () => Promise.reject(new Error("no debió llamarse")) }
+    const r = await correr([modelo], "hola", { historial: [], tokens: 1000 })
+    expect(r.respuesta).toContain("límite de uso")
+  })
+
+  test("suma los tokens que gasta cada respuesta", async () => {
+    const sesion: Sesion = { historial: [], tokens: 0 }
+    const modelo: Adaptador = { generar: async () => ({ texto: "ok", llamadas: [], tokens: 120 }) }
+    await correr([modelo], "hola", sesion)
+    expect(sesion.tokens).toBe(120)
   })
 
   test("detecta confirmaciones y negaciones", () => {
@@ -63,7 +86,7 @@ describe("ciclo del agente", () => {
     const infinito: Adaptador = {
       generar: async () => ({ texto: "", llamadas: [llamar("proveedor_leer_solicitud", { caso: "ec-corp-andina" })] }),
     }
-    const r = await correr([infinito], "hola")
+    const r = await correr([infinito], "hola", undefined, { maxPasos: 8, maxTokens: 1000 })
     expect(r.respuesta).toContain("límite")
     expect(r.herramientas.length).toBe(8)
   })
@@ -133,5 +156,31 @@ describe("adaptador de Gemini (fetch simulado)", () => {
     expect(enviado?.contents.length).toBe(3)
     expect(enviado?.contents[2]?.parts.length).toBe(2)
     globalThis.fetch = original
+  })
+})
+
+describe("errores controlados (HU-5)", () => {
+  test("una plantilla corrupta da mensaje claro y el siguiente caso sigue funcionando", async () => {
+    // Copia de los fixtures en una carpeta temporal para no dañar los originales.
+    const temporal = mkdtempSync(join(tmpdir(), "reto01-"))
+    await cp(join(ctx.directory, "fixtures"), join(temporal, "fixtures"), { recursive: true })
+    writeFileSync(join(temporal, "fixtures", "reto-01", "casos", "ec-corp-andina", "plantilla-campos.json"), "{ no es json")
+    const ctxTemporal = { directory: temporal, sessionId: "corrupta" }
+
+    const malo = JSON.parse(await ejecutar("proveedor_leer_solicitud", { caso: "ec-corp-andina" }, ctxTemporal, false))
+    expect(malo.ok).toBe(false)
+    expect(malo.error).toContain("corrupto")
+    expect(malo.error).not.toContain("at ") // sin traza cruda
+
+    const bueno = JSON.parse(await ejecutar("proveedor_leer_solicitud", { caso: "co-industrias-delta" }, ctxTemporal, false))
+    expect(bueno.ok).toBe(true)
+    rmSync(temporal, { recursive: true, force: true })
+  })
+
+  test("un caso de portal responde formato no soportado y deja los valores para copiar", async () => {
+    const r = JSON.parse(await ejecutar("proveedor_generar_formulario", { caso: "pa-logistica-istmo" }, ctx, false))
+    expect(r.ok).toBe(true)
+    expect(JSON.stringify(r.data)).toContain("no soportado")
+    expect(existsSync(join(ctx.directory, "out", "pa-logistica-istmo", "valores-portal.md"))).toBe(true)
   })
 })

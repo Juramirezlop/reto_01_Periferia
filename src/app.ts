@@ -1,12 +1,12 @@
-import { responder, type Resultado } from "./agent/loop"
+import { responder, type Resultado, type Sesion } from "./agent/loop"
 import { construirSistema } from "./agent/sistema"
 import { config } from "./config"
-import type { Adaptador, Entrada } from "./llm/adapter"
+import type { Adaptador } from "./llm/adapter"
 import { crearGemini } from "./llm/gemini"
 import type { Ctx } from "./tools/util"
 
 // Una conversación por sessionId, en memoria (el PRD no pide base de datos).
-const sesiones = new Map<string, Entrada[]>()
+const sesiones = new Map<string, Sesion>()
 
 function adaptadoresPorDefecto(): Adaptador[] {
   return [config.modelo, config.modeloRespaldo]
@@ -25,9 +25,10 @@ export async function manejarMensaje(
   }
   const adaptadores = adaptadoresPrueba ?? adaptadoresPorDefecto()
   const ctx: Ctx = { directory, sessionId }
-  const historial = sesiones.get(sessionId) ?? []
-  sesiones.set(sessionId, historial)
-  return responder({ adaptadores, sistema: await construirSistema(ctx), historial, mensaje, ctx })
+  const sesion = sesiones.get(sessionId) ?? { historial: [], tokens: 0 }
+  sesiones.set(sessionId, sesion)
+  const limites = { maxPasos: config.maxPasos, maxTokens: config.maxTokensSesion }
+  return responder({ adaptadores, sistema: await construirSistema(ctx), sesion, limites, mensaje, ctx })
 }
 
 export const reiniciarSesion = (sessionId: string) => sesiones.delete(sessionId)

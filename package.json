@@ -3,14 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "bun run src/scripts/dev.ts",
     "start": "bun run src/server.ts",
+    "build:web": "vite build",
     "chat": "bun run src/scripts/chat.ts",
     "demo": "bun run demo.ts",
     "modelos": "bun run src/scripts/modelos.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
-    "dev": "vite",
-    "build:web": "vite build"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
+    "@types/node": "^26.6.5",
     "@types/pdfkit": "^0.17.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

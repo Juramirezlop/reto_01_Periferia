@@ -7,7 +7,8 @@ while (true) {
   const mensaje = prompt("Tú:")?.trim() // prompt() lee una línea de la terminal (viene con Bun)
   if (mensaje === undefined || mensaje === "salir") break
   if (!mensaje) continue
-  const { respuesta, herramientas } = await manejarMensaje("terminal", mensaje)
+  const { respuesta, herramientas, tokens } = await manejarMensaje("terminal", mensaje)
   if (herramientas.length) console.log(`  [herramientas: ${herramientas.map((h) => `${h.nombre}${h.ok ? "" : " ✗"}`).join(", ")}]`)
   console.log(`\nAgente: ${respuesta}\n`)
+  if (tokens) console.log(`  [tokens usados en la sesión: ${tokens}]\n`)
 }

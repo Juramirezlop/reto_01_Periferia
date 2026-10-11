@@ -11,7 +11,7 @@ export type VistaCaso = {
   archivos: string[]
 }
 
-export type Respuesta = { respuesta: string; herramientas: { nombre: string; ok: boolean }[] }
+export type Respuesta = { respuesta: string; herramientas: { nombre: string; ok: boolean }[]; tokens?: number }
 export type Salud = { modelo: string; clave: boolean; fecha: string }
 
 async function pedir<T>(url: string, init?: RequestInit): Promise<T> {

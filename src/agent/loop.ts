@@ -3,25 +3,36 @@ import type { Ctx } from "../tools/util"
 import { declaraciones, ejecutar } from "./herramientas"
 import { confirmaEnvio } from "./sistema"
 
-export type Resultado = { respuesta: string; herramientas: { nombre: string; ok: boolean }[] }
+// Último texto que escribió el agente (sirve para entender un "sí" de la analista).
+const ultimoTextoDelAgente = (historial: Entrada[]) =>
+  [...historial].reverse().find((e): e is Extract<Entrada, { tipo: "modelo" }> => e.tipo === "modelo" && e.texto !== "")?.texto ?? ""
 
-const MAX_PASOS = 8 // tope de idas y vueltas con el modelo por mensaje (control de costo)
+export type Resultado = { respuesta: string; herramientas: { nombre: string; ok: boolean }[]; tokens?: number }
+
+// Estado de una conversación: lo dicho y lo gastado.
+export type Sesion = { historial: Entrada[]; tokens: number }
+export type Limites = { maxPasos: number; maxTokens: number }
 
 // Un turno del agente: el usuario escribe -> el modelo pide herramientas -> se ejecutan -> repite -> respuesta.
 // `adaptadores` va en orden de preferencia: el primero es el principal, el resto son respaldo.
 export async function responder(opciones: {
   adaptadores: Adaptador[]
   sistema: string
-  historial: Entrada[] // se modifica: así la conversación recuerda lo anterior
+  sesion: Sesion // se modifica: así la conversación recuerda lo anterior y lo gastado
+  limites: Limites
   mensaje: string
   ctx: Ctx
 }): Promise<Resultado> {
-  const { adaptadores, sistema, historial, mensaje, ctx } = opciones
+  const { adaptadores, sistema, sesion, limites, mensaje, ctx } = opciones
+  const { historial } = sesion
   const usadas: Resultado["herramientas"] = []
-  const confirmo = confirmaEnvio(mensaje)
+  const confirmo = confirmaEnvio(mensaje, ultimoTextoDelAgente(historial))
   historial.push({ tipo: "usuario", texto: mensaje })
 
-  for (let paso = 0; paso < MAX_PASOS; paso++) {
+  for (let paso = 0; paso < limites.maxPasos; paso++) {
+    if (sesion.tokens >= limites.maxTokens) {
+      return { respuesta: "Esta conversación alcanzó su límite de uso. Pulsa ↺ para empezar una nueva.", herramientas: usadas, tokens: sesion.tokens }
+    }
     // Probamos cada modelo hasta que uno responda.
     let respuesta
     let ultimoError = "sin modelos configurados"
@@ -35,11 +46,12 @@ export async function responder(opciones: {
       }
     }
     if (!respuesta) {
-      return { respuesta: `No pude consultar el modelo (${ultimoError}). Intenta de nuevo en un momento.`, herramientas: usadas }
+      return { respuesta: `No pude consultar el modelo (${ultimoError}). Intenta de nuevo en un momento.`, herramientas: usadas, tokens: sesion.tokens }
     }
 
+    sesion.tokens += respuesta.tokens ?? 0
     historial.push({ tipo: "modelo", texto: respuesta.texto, llamadas: respuesta.llamadas, crudo: respuesta.crudo })
-    if (respuesta.llamadas.length === 0) return { respuesta: respuesta.texto, herramientas: usadas }
+    if (respuesta.llamadas.length === 0) return { respuesta: respuesta.texto, herramientas: usadas, tokens: sesion.tokens }
 
     for (const llamada of respuesta.llamadas) {
       const contenido = await ejecutar(llamada.nombre, llamada.args, ctx, confirmo)
@@ -47,5 +59,5 @@ export async function responder(opciones: {
       historial.push({ tipo: "resultado", nombre: llamada.nombre, contenido })
     }
   }
-  return { respuesta: "Llegué al límite de pasos sin terminar. Pídeme algo más acotado.", herramientas: usadas }
+  return { respuesta: "Llegué al límite de pasos sin terminar. Pídeme algo más acotado.", herramientas: usadas, tokens: sesion.tokens }
 }
