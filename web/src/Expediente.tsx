@@ -74,7 +74,7 @@ export function Expediente({ caso, vista }: { caso: string; vista: VistaCaso }) 
 
       {vista.archivos.length > 0 && (
         <>
-          <h3>Archivos del paquete</h3>
+          <h3>Archivos generados</h3>
           <ul className="archivos">
             {vista.archivos.map((a) => (
               <li key={a}><a href={urlArchivo(caso, a)} download>{a}</a></li>

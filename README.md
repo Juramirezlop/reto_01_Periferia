@@ -16,26 +16,26 @@ La clave se obtiene gratis en [Google AI Studio](https://aistudio.google.com/api
 
 ## Variables de entorno
 
-| Variable | Para qué | Por defecto |
-|---|---|---|
-| `GEMINI_API_KEY` | Clave del modelo (solo la lee el backend) | — (obligatoria) |
-| `LLM_MODEL` / `LLM_MODEL_RESPALDO` | Modelo principal y de respaldo | `gemini-3.6-flash` / `gemini-3.1-flash-lite` |
-| `MAX_PASOS` | Máximo de idas y vueltas con el modelo por mensaje | 8 |
-| `MAX_TOKENS_SESION` | Tope de tokens por conversación | 150000 |
-| `FECHA_EJECUCION` | Fecha para validar vigencias (AAAA-MM-DD) | 2026-09-03 |
-| `PORT` | Puerto del servidor | 3000 |
+| Variable                               | Para qué                                           | Por defecto                                      |
+| -------------------------------------- | --------------------------------------------------- | ------------------------------------------------ |
+| `GEMINI_API_KEY`                     | Clave del modelo (solo la lee el backend)           | — (obligatoria)                                 |
+| `LLM_MODEL` / `LLM_MODEL_RESPALDO` | Modelo principal y de respaldo                      | `gemini-3.6-flash` / `gemini-3.1-flash-lite` |
+| `MAX_PASOS`                          | Máximo de idas y vueltas con el modelo por mensaje | 8                                                |
+| `MAX_TOKENS_SESION`                  | Tope de tokens por conversación                    | 150000                                           |
+| `FECHA_EJECUCION`                    | Fecha para validar vigencias (AAAA-MM-DD)           | 2026-09-03                                       |
+| `PORT`                               | Puerto del servidor                                 | 3000                                             |
 
 ## Comandos
 
-| Comando | Qué hace |
-|---|---|
-| `bun run dev` | Backend y front con recarga (desarrollo) |
-| `bun run build:web` + `bun run start` | Compila el front y lo sirve junto con la API (producción, un solo puerto) |
-| `bun run demo` | Corre todas las herramientas sobre los 4 casos, **sin modelo ni clave** |
-| `bun run chat` | Chat por terminal con el agente |
-| `bun test` | Pruebas automáticas (modelo simulado, sin clave) |
-| `bun run typecheck` | Revisa los tipos de backend y front |
-| `bun run modelos` | Lista y prueba los modelos disponibles para tu clave |
+| Comando                                   | Qué hace                                                                    |
+| ----------------------------------------- | ---------------------------------------------------------------------------- |
+| `bun run dev`                           | Backend y front con recarga (desarrollo)                                     |
+| `bun run build:web` + `bun run start` | Compila el front y lo sirve junto con la API (producción, un solo puerto)   |
+| `bun run demo`                          | Corre todas las herramientas sobre los 4 casos,**sin modelo ni clave** |
+| `bun run chat`                          | Chat por terminal con el agente                                              |
+| `bun test`                              | Pruebas automáticas (modelo simulado, sin clave)                            |
+| `bun run typecheck`                     | Revisa los tipos de backend y front                                          |
+| `bun run modelos`                       | Lista y prueba los modelos disponibles para tu clave                         |
 
 ## Probar el agente
 

@@ -26,6 +26,7 @@ export async function responder(opciones: {
   const { adaptadores, sistema, sesion, limites, mensaje, ctx } = opciones
   const { historial } = sesion
   const usadas: Resultado["herramientas"] = []
+  const yaEjecutadas = new Map<string, string>() // "herramienta + argumentos" -> resultado, para no repetir en el mismo mensaje
   const confirmo = confirmaEnvio(mensaje, ultimoTextoDelAgente(historial))
   historial.push({ tipo: "usuario", texto: mensaje })
 
@@ -54,7 +55,10 @@ export async function responder(opciones: {
     if (respuesta.llamadas.length === 0) return { respuesta: respuesta.texto, herramientas: usadas, tokens: sesion.tokens }
 
     for (const llamada of respuesta.llamadas) {
-      const contenido = await ejecutar(llamada.nombre, llamada.args, ctx, confirmo)
+      // Si el modelo repite exactamente la misma llamada, se reutiliza el resultado (ahorra tiempo y registros duplicados).
+      const clave = `${llamada.nombre}:${JSON.stringify(llamada.args)}`
+      const contenido = yaEjecutadas.get(clave) ?? (await ejecutar(llamada.nombre, llamada.args, ctx, confirmo))
+      yaEjecutadas.set(clave, contenido)
       usadas.push({ nombre: llamada.nombre, ok: (JSON.parse(contenido) as { ok: boolean }).ok })
       historial.push({ tipo: "resultado", nombre: llamada.nombre, contenido })
     }

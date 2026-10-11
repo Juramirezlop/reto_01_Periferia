@@ -12,7 +12,3 @@
   },
   "include": ["src", "demo.ts"]
 }
-
-// cd "C:\Users\WIN11\Downloads\Retos IA Periferia IT Group\reto-01"
-// bun install
-// bun run demo.ts

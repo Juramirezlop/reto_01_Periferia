@@ -24,7 +24,7 @@ async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
 export const obtenerSalud = () => pedir<Salud>("/api/salud")
 export const obtenerCasos = () => pedir<string[]>("/api/casos")
 export const obtenerCaso = (caso: string) => pedir<VistaCaso>(`/api/caso/${caso}`)
-export const urlArchivo = (caso: string, archivo: string) => `/api/archivo/${caso}/paquete/${archivo}`
+export const urlArchivo = (caso: string, archivo: string) => `/api/archivo/${caso}/${archivo}`
 
 export const enviarMensaje = (sessionId: string, mensaje: string) =>
   pedir<Respuesta>("/api/chat", {

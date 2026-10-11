@@ -184,3 +184,17 @@ describe("errores controlados (HU-5)", () => {
     expect(existsSync(join(ctx.directory, "out", "pa-logistica-istmo", "valores-portal.md"))).toBe(true)
   })
 })
+
+describe("ahorro de llamadas", () => {
+  test("si el modelo repite la misma llamada en un mensaje, la herramienta corre una sola vez", async () => {
+    const igual = llamar("proveedor_leer_solicitud", { caso: "ec-corp-andina" })
+    const modelo = guion({ llamadas: [igual, igual] }, { texto: "listo" })
+    await ejecutar("proveedor_armar_paquete", { caso: "ec-corp-andina" }, ctx, false) // crea out/ec-corp-andina
+    const registro = join(ctx.directory, "out", "ec-corp-andina", "log.jsonl")
+    const antes = (await Bun.file(registro).text()).split("\n").filter((l) => l.includes("leer_solicitud")).length
+    const r = await correr([modelo], "hola")
+    const despues = (await Bun.file(registro).text()).split("\n").filter((l) => l.includes("leer_solicitud")).length
+    expect(despues - antes).toBe(1)
+    expect(r.herramientas.length).toBe(2) // se informan las dos llamadas, pero solo una se ejecutó
+  })
+})

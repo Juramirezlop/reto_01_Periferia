@@ -1,155 +1,173 @@
-# SOLUCION.md — Reto técnico 01: agente "Registro como Proveedor"
+# Solución al reto 01: agente "Registro como Proveedor"
 
-## 1. Problema en una frase
+## 1. El problema
 
-La analista administrativa de Periferia transcribe a mano, entre 8 y 12 veces al mes, los mismos datos de la empresa en formularios de clientes (Excel, PDF o portal web) y busca a mano los soportes vigentes; este agente prepara el formulario y el paquete para firma, y deja la decisión de enviar a una persona.
+La analista administrativa de Periferia pasa buena parte del mes copiando a mano los mismos datos de la empresa en formularios de distintos clientes (Excel, PDF o portales web) y buscando cada soporte para ver si sigue vigente. Son entre 8 y 12 formularios al mes y el conocimiento de qué pide cada país está en la cabeza de una sola persona.
+
+Construí un agente que lee la solicitud, llena el formulario desde el repositorio maestro, arma el paquete de soportes y deja todo listo para la firma. El agente nunca firma ni envía: eso lo decide una persona.
 
 ## 2. Arquitectura
 
-```
- Navegador (React + Vite)                    Servidor Bun (src/server.ts)
-┌────────────────────────────┐   /api/chat   ┌─────────────────────────────────────────┐
-│ Casos │ Conversación │ Exp.│ ────────────► │ app.ts: sesión (historial + tokens)     │
-│       │  (chat)      │(panel)│             │   └► agent/loop.ts  ◄──► llm/gemini.ts ─┼──► Gemini API
-│       │              │     │ ◄──────────── │        │  (ciclo, topes, respaldo)      │    (HTTPS, clave
-└────────────────────────────┘  respuesta    │        ▼                                │     solo aquí)
-   │  /api/caso/:caso (panel, sin modelo)     │  agent/herramientas.ts (registro + zod) │
-   └────────────────────────────────────────► │        ▼                                │
-                                              │  tools/proveedor.ts (5 herramientas)    │
-                                              │   ├ datos.ts (lee y valida fixtures)    │
-                                              │   ├ mapeo.ts (glosario → maestro)       │
-                                              │   └ formularios.ts (xlsx / pdf / md)    │
-                                              └───────────────┬─────────────────────────┘
-                                                              ▼
-                              fixtures/ (entrada)         out/<caso>/ (salida: formulario, paquete/,
-                                                          estado.json, ENVIO-SIMULADO.md, log.jsonl)
+```mermaid
+flowchart LR
+    A[Navegador<br/>React + Vite] -->|/api/chat| B[Servidor Bun]
+    A -->|/api/caso y /api/archivo| B
+    B --> C[Ciclo del agente]
+    C <-->|HTTPS| D[Gemini API]
+    C --> E[5 herramientas<br/>con zod]
+    E --> F[(fixtures<br/>entrada)]
+    E --> G[(out/caso<br/>salida)]
 ```
 
-| Pieza | Dónde vive |
-|---|---|
-| Prompt | `agent/prompt.md` |
-| Conocimiento del proceso | `src/knowledge/registro-proveedor.md` (se concatena al prompt en `src/agent/sistema.ts`) |
-| Ejecución (herramientas) | `src/tools/proveedor.ts`; contrato y validación en `src/tools/util.ts` |
-| Ciclo del agente | `src/agent/loop.ts` |
-| Modelo | `src/llm/adapter.ts` (contrato) y `src/llm/gemini.ts` (implementación) |
+El panel de la derecha de la pantalla (el expediente) no usa el modelo: llama directamente a las herramientas, así que siempre muestra el estado real del caso aunque Gemini falle.
 
-Idea central: **el modelo conversa y decide qué herramienta llamar; el código decide los valores.** El mapeo etiqueta → dato del maestro, la vigencia de los soportes y el estado `listo_para_firma` son código determinista que el modelo no puede alterar.
+Dónde vive cada cosa:
+
+- El prompt está en `agent/prompt.md`.
+- El conocimiento del proceso está en `src/knowledge/registro-proveedor.md` y se une al prompt en `src/agent/sistema.ts`.
+- Las herramientas están en `src/tools/proveedor.ts`. Leer los archivos, mapear los campos y generar los formularios están en `datos.ts`, `mapeo.ts` y `formularios.ts`.
+- El ciclo del agente está en `src/agent/loop.ts`.
+- La conexión con el modelo está en `src/llm/` (un contrato en `adapter.ts` y la implementación de Gemini en `gemini.ts`).
+
+La idea central es que el modelo conversa y decide qué herramienta llamar, pero los valores los decide el código. El mapeo de cada etiqueta al maestro, la vigencia de los soportes y el estado "listo para firma" son código determinista que el modelo no puede cambiar.
 
 ## 3. Ciclo del agente
 
-`responder()` en `src/agent/loop.ts`, por cada mensaje de la analista:
+```mermaid
+flowchart TD
+    M[Mensaje de la analista] --> T{¿Se pasó el tope<br/>de tokens?}
+    T -->|sí| X[Responde que la conversación<br/>llegó a su límite]
+    T -->|no| L[Llama al modelo<br/>20 s de espera, con respaldo]
+    L --> Q{¿Pide herramientas?}
+    Q -->|no| R[Respuesta final]
+    Q -->|sí| H[Ejecuta las herramientas<br/>y guarda los resultados]
+    H --> P{¿Se pasó el tope<br/>de pasos?}
+    P -->|no| T
+    P -->|sí| Y[Corta y avisa]
+```
 
-1. Agrega el mensaje al historial de la sesión.
-2. Llama al modelo con el prompt, el historial y las herramientas (esquemas generados desde zod con `z.toJSONSchema`).
-3. Si el modelo pide herramientas, las ejecuta y agrega los resultados al historial; vuelve al paso 2. Si responde texto, termina.
+Por cada mensaje, `responder()` agrega el mensaje al historial, llama al modelo con el prompt y las herramientas, ejecuta lo que el modelo pida y vuelve a llamarlo hasta que responda con texto.
 
-Topes y protecciones:
-- **Iteraciones:** `MAX_PASOS` (8 por defecto) por mensaje.
-- **Tokens:** `MAX_TOKENS_SESION` (150 000 por defecto) por conversación; se suman con `usageMetadata` de Gemini y, al llegar al tope, el agente deja de llamar al modelo.
-- **Timeout y respaldo:** 20 s por llamada. Si el modelo principal agota el tiempo, devuelve 429 o 5xx, se prueba el modelo de respaldo. Los errores que no se arreglan con otro modelo (clave inválida, 403, 404) se informan sin reintentar.
-- **Confirmación humana (RN4), aplicada en código y no solo en el prompt:** `simular_envio` recibe `confirmado` desde el código (`agent/herramientas.ts`), nunca del modelo. Solo es `true` si el mensaje de la analista confirma ("confirmo", "envíalo", o un "sí" justo después de que el agente pidió confirmación) y no contiene "no". Sin confirmación la herramienta responde `requiere confirmación explícita`.
-- **Errores:** ninguna herramienta lanza; `definirHerramienta` valida con zod, captura excepciones y devuelve `{ ok, data }` o `{ ok: false, error }` (HU-5). Cada llamada queda en `out/log.jsonl` y en `out/<caso>/log.jsonl` (RN5).
-- **Datos sensibles:** `mapear_campos` enmascara los datos bancarios antes de devolverlos al modelo (`***2345`); el valor real solo se escribe en el archivo generado (RN2). El cuerpo del correo del cliente no se entrega al modelo, lo que reduce el riesgo de inyección de instrucciones desde una solicitud.
+Los topes y las protecciones:
+
+- Pasos: `MAX_PASOS` (8 por defecto) idas y vueltas por mensaje.
+- Tokens: `MAX_TOKENS_SESION` (150 000 por defecto) por conversación. Se suman con lo que Gemini reporta en cada respuesta; al llegar al tope el agente deja de llamar al modelo.
+- Timeout y respaldo: 20 segundos por llamada. Si el modelo principal se demora, devuelve 429 o un error 5xx, se prueba el modelo de respaldo. Los errores que otro modelo no arregla (clave inválida, 403, 404) se informan sin reintentar.
+- Llamadas repetidas: si el modelo pide exactamente la misma herramienta con los mismos argumentos dentro del mismo mensaje, se reutiliza el resultado.
+- La confirmación humana está en el código, no solo en el prompt. A `simular_envio` el valor de `confirmado` lo pone el código, nunca el modelo, y solo es verdadero si el mensaje de la analista confirma ("confirmo", "envíalo", o un "sí" justo después de que el agente pidió confirmación) y no contiene un "no". Sin eso la herramienta responde "requiere confirmación explícita".
+- Los errores no rompen nada: cada herramienta valida sus argumentos con zod, atrapa las excepciones y devuelve `{ ok, data }` o `{ ok: false, error }`. Cada llamada queda en `out/log.jsonl` y en `out/<caso>/log.jsonl`.
+- Los datos bancarios se enmascaran (`***2345`) antes de llegar al modelo; el valor real solo se escribe en el archivo generado. El cuerpo del correo del cliente tampoco se le entrega, lo que reduce el riesgo de que una solicitud traiga instrucciones escondidas.
 
 ## 4. Elección del modelo
 
-- **Proveedor:** Google AI Studio (API de Gemini, nivel gratuito). Se buscó una opción sin costo.
-- **Modelos:** `gemini-3.6-flash` (principal) y `gemini-3.1-flash-lite` (respaldo).
-- **Por qué:** se probaron con una llamada de herramienta, 3 veces cada uno (`bun run modelos`). `gemini-3.6-flash` fue el más estable; `gemini-3.8-flash` y `gemini-3.1-flash-lite` tuvieron picos de 15 a 30 s, por eso el timeout de 20 s y el respaldo. `gemini-2.5-flash` ya no está disponible para cuentas nuevas.
-- **Suscripción vs API:** la suscripción Google AI Pro no sube los límites de la API; solo habilitar facturación (Tier 1) lo hace.
-- **Costo por caso:** en el nivel gratuito, 0. El consumo real se mide con los tokens que reporta cada respuesta (`bun run chat` los imprime). Para estimar el costo en un plan de pago: `tokens por caso × precio por token del modelo`. **Pendiente: anotar aquí el consumo medido de un caso completo.** _(Medición: ____ tokens por caso.)_
-- **Privacidad:** en el nivel gratuito Google puede usar los prompts para mejorar sus productos; por eso solo se usan datos ficticios. Para producción se usaría un plan de pago.
+Uso Google AI Studio (API de Gemini en el nivel gratuito), con `gemini-3.6-flash` como principal y `gemini-3.1-flash-lite` como respaldo. Quería una opción sin costo.
 
-## 5. Diseño del portal web (sección 7.4 del PRD)
+Los probé con una llamada de herramienta, tres veces cada uno (`bun run modelos`). El 3.6 fue el más estable. El 3.8 y el 3.1-lite tuvieron picos de 15 a 30 segundos, y por eso el timeout de 20 segundos y el respaldo. El `gemini-2.5-flash` ya no está disponible para cuentas nuevas.
 
-**Lo que sí hace hoy:** para un caso con formato `portal` la herramienta responde `formato no soportado` y escribe `out/<caso>/valores-portal.md` con una tabla etiqueta → valor para copiar. El paquete queda en etapa "carga en portal" (no hay firma); la lista de adjuntos excluye ese archivo porque puede llevar datos bancarios.
+Otra cosa que aprendí: la suscripción Google AI Pro no sube los límites de la API; solo habilitar facturación lo hace.
 
-**Cómo se automatizaría:**
-- **Estrategia:** un navegador controlado por el agente (Playwright o una extensión de navegador que opera sobre la sesión abierta de la analista) que recorre el portal y llena campos usando solo los valores del mapeo. Frente a RPA clásico tiene la ventaja de que se adapta mejor a cambios de layout (localiza campos por etiqueta, no por posición); frente a una extensión, la ventaja de correr aislado.
-- **Límites:** CAPTCHA, MFA y cambios de layout rompen la automatización. Ante cualquiera de ellos el agente se detiene y entrega los valores en `valores-portal.md`, que es lo que ya hace hoy. Los portales con MFA se operan siempre de forma manual.
-- **Credenciales:** nunca en el repositorio, en el prompt ni en logs. Viven en un gestor de secretos (por ejemplo variables del entorno de despliegue o un vault) y las **ingresa la analista** en el navegador; el agente nunca las ve. El log solo registra el resultado de cada acción, no los valores de campos sensibles.
-- **Reparto:** el agente abre el portal, llena campos y deja una captura de lo llenado. **Humano:** ingresar las credenciales, resolver CAPTCHA/MFA, revisar y hacer clic en "Enviar". El clic final es siempre humano (RN4).
+Costo por caso: en el nivel gratuito es cero. Para estimar el costo en un plan de pago hay que medir los tokens por caso, y `bun run chat` los imprime al final de cada respuesta. Una consulta general, sin procesar ningún caso, gastó 8 526 tokens en total (cada paso del ciclo vuelve a enviar el historial). Falta anotar la medición de un caso completo: ____ tokens.
 
-## 6. Decisiones y trade-offs
+Privacidad: en el nivel gratuito Google puede usar los prompts para mejorar sus productos. Por eso en el reto solo hay datos ficticios; para datos reales usaría un plan de pago.
 
-| Decisión | Alternativa descartada | Por qué |
-|---|---|---|
-| **Mapeo determinista en código** (glosario → maestro, confianza 1.0 exacta, 0.7 parcial → por confirmar) | Que el modelo mapee los campos | El PRD prohíbe inventar valores; con código cada valor es trazable. Costo: lo que no está en el glosario es `faltante`, aunque una persona lo reconocería. |
-| **Bun** como runtime (TypeScript nativo, servidor y pruebas en un solo programa) | Node + tsx/vitest, o Docker Compose | Menos piezas y arranque más rápido. El PRD acepta `bun run dev` o `docker compose up`. Costo: Bun es menos conocido y su despliegue es menos estándar. |
-| **Adaptador propio con `fetch`** sobre `generateContent` de Gemini | SDK oficial; Interactions API (la que Google recomienda ahora) | Control explícito de timeout, respaldo y firmas de razonamiento de Gemini 3 en ~100 líneas legibles. Costo: hay que mantener la compatibilidad con la API; una migración a Interactions API queda pendiente. |
-| **Confirmación aplicada en código** | Confiar en el prompt | Un prompt puede ignorarse; el código no. Costo: la detección de "confirmo" es por patrones y es conservadora (ante la duda, pide confirmar). |
-| **Sin base de datos** (sesiones y resultados en memoria y en `out/`) | PostgreSQL en Railway | El PRD no la pide. Costo: se pierden las conversaciones al reiniciar. |
-| **Front React + Vite** con un expediente calculado sin el modelo | Un HTML simple | Permite ver el estado real del caso aunque el modelo falle y descargar los archivos sin acceso al disco del servidor. |
+## 5. Diseño del portal web
+
+Lo que ya hace hoy: para un caso con formato portal la herramienta responde "formato no soportado" y escribe `out/<caso>/valores-portal.md` con una tabla etiqueta y valor para copiar. El paquete queda en etapa "carga en portal" (no hay firma) y el correo no adjunta ese archivo, porque puede llevar datos bancarios.
+
+Cómo lo automatizaría:
+
+```mermaid
+flowchart LR
+    A[Agente: prepara los valores<br/>y el paquete] --> B[Analista abre el portal<br/>e ingresa sus credenciales]
+    B --> C[Agente llena los campos<br/>con el navegador controlado]
+    C -->|CAPTCHA, MFA o cambio<br/>de pantalla| D[Se detiene: la analista<br/>copia desde valores-portal.md]
+    C --> E[Captura de lo llenado]
+    E --> F[Analista revisa<br/>y hace clic en Enviar]
+    D --> F
+```
+
+- Estrategia: un navegador controlado por el agente (Playwright, o una extensión que opere sobre la sesión abierta de la analista). Frente a un RPA clásico se adapta mejor a cambios de diseño, porque busca los campos por su etiqueta y no por su posición.
+- Límites: un CAPTCHA, un MFA o un cambio fuerte de la pantalla rompen la automatización. En cualquiera de esos casos el agente se detiene y la analista copia desde `valores-portal.md`, que es lo que ya existe. Los portales con MFA se operan siempre a mano.
+- Credenciales: nunca van en el repositorio, en el prompt ni en los logs. Viven en un gestor de secretos y las ingresa la analista en el navegador; el agente nunca las ve.
+- Reparto: el agente llena campos y deja una captura. La analista ingresa las credenciales, resuelve CAPTCHA o MFA, revisa y hace clic en "Enviar". Ese último clic es siempre humano.
+
+## 6. Decisiones y alternativas descartadas
+
+1. Mapeo en código y no con el modelo. Cada etiqueta se cruza con el maestro mediante el glosario: coincidencia exacta es confianza 1.0 y coincidencia parcial es 0.7 y queda por confirmar. Descarté dejar que el modelo mapee porque el PRD prohíbe inventar valores y con código cada valor es trazable. El costo es que lo que no está en el glosario es "faltante", aunque una persona lo reconocería.
+2. Bun como runtime. Corre TypeScript directo y trae servidor y pruebas en un solo programa. Descarté Node con tsx y vitest, y también Docker Compose, por tener menos piezas. El costo es que Bun es menos conocido y su despliegue es menos estándar.
+3. Un adaptador propio con `fetch` sobre `generateContent` de Gemini. Descarté el SDK oficial y la Interactions API (la que Google recomienda hoy) porque así controlo el timeout, el respaldo y las firmas de razonamiento de Gemini 3 en unas cien líneas. El costo es que yo mantengo la compatibilidad; migrar a Interactions API queda pendiente.
+4. Confirmación aplicada en el código. Descarté confiar solo en el prompt porque un prompt se puede ignorar. El costo es que detectar "confirmo" por patrones es conservador: ante la duda, el agente vuelve a pedir confirmación.
+5. Sin base de datos, tal como pide el PRD. Las sesiones viven en memoria y los resultados en `out/`. Se pierden al reiniciar el servidor.
+6. Un front en React con el expediente calculado sin el modelo, en lugar de un HTML simple. Así se ve el estado real del caso aunque el modelo falle y la analista descarga los archivos sin tener acceso al disco del servidor.
 
 ## 7. Supuestos
 
-- Los fixtures ya traen la plantilla extraída a JSON (`plantilla-celdas.json`, `plantilla-campos.json`); no se lee ni se hace OCR de un .xlsx o .pdf real del cliente.
-- La fecha de ejecución por defecto es la del PRD (2026-09-03) para que el resultado sea reproducible; se cambia con `FECHA_EJECUCION` o comentando la línea de `src/config.ts`.
-- Un soporte con `vigencia_hasta` igual a la fecha de ejecución se considera vigente; solo uno anterior está vencido.
-- En un caso `portal`, "listo" significa listo para cargar en portal (no hay firma). Esa lectura es mía; el PRD no la define.
-- Los datos bancarios van en `valores-portal.md` cuando la plantilla los pide (RN2), pero ese archivo no se adjunta al correo.
-- El NIT no se trata como dato sensible; solo lo bancario.
-- "Confirmación en el turno inmediatamente anterior" (RN4) se interpreta como el mensaje actual de la analista.
+- Los fixtures ya traen la plantilla extraída a JSON. No leo ni hago OCR de un .xlsx o .pdf real del cliente.
+- La fecha de ejecución por defecto es la del PRD (2026-09-03), para que el resultado sea reproducible. Se cambia con `FECHA_EJECUCION` o comentando la línea de `src/config.ts`.
+- Un soporte cuya vigencia es igual a la fecha de ejecución se considera vigente; solo uno anterior está vencido.
+- En un caso de portal, "listo" significa listo para cargar en el portal, porque no hay firma. El PRD no lo define; es mi lectura.
+- Los datos bancarios van en `valores-portal.md` cuando la plantilla los pide (regla RN2), pero ese archivo no se adjunta al correo.
+- El NIT no lo trato como dato sensible; solo lo bancario.
+- Entiendo "confirmación en el turno inmediatamente anterior" (RN4) como el mensaje actual de la analista.
 
 ## 8. Cobertura
 
-| Ítem | Estado | Evidencia |
+| Historia o requisito | Estado | Dónde se comprueba |
 |---|---|---|
-| HU-1 Leer la solicitud (campos, país, formato, soportes, ambiguos con propuesta) | Hecho | `proveedor_leer_solicitud`; `bun run demo` |
-| HU-2 Mapear al maestro (lleno / faltante / por confirmar; glosario) | Hecho | `src/tools/mapeo.ts`; demo (EC: RUC por confirmar, "contribuyente especial" faltante) |
-| HU-3 Excel (celdas exactas) | Hecho | `formulario.xlsx` de CO y HN |
-| HU-3 PDF (todos los campos en orden) | Hecho | `formulario.pdf` de EC |
-| HU-3 Portal (`formato no soportado` + `valores-portal.md`) | Hecho | PA; prueba automática |
-| HU-4 Paquete (formulario, soportes, checklist, borrador de correo, vencidos bloquean) | Hecho | `out/<caso>/paquete/`; `estado.json` |
-| HU-4 Resumen y pregunta de confirmación; envío solo escribe `ENVIO-SIMULADO.md` | Hecho | prompt + `simular_envio`; pruebas |
-| HU-5 Errores sin excepción (caso inexistente, plantilla corrupta, argumentos inválidos) | Hecho | pruebas automáticas |
-| RN1 Identificador por país y nota "identificador extranjero" | Hecho | HN (RTN), PA (RUC), EC (RUC) |
-| RN2 Banco solo si la plantilla lo pide; nunca en el correo | Hecho | prueba de enmascarado; `borrador-correo.md` |
-| RN3 Vencido o ausente bloquea; faltante no | Hecho | demo (EC y HN bloqueados) |
-| RN4 Confirmación explícita antes de cualquier acción externa | Hecho (en código) | pruebas de `confirmaEnvio` y de `ejecutar` |
-| RN5 Registro en `out/<caso>/log.jsonl` | Hecho | `util.ts` |
-| Arranque con un comando (`bun run dev`) | Hecho | probado |
-| `demo.ts` determinista, sin clave, `out/` limpia al inicio | Hecho | `bun run demo` |
-| Seguridad: clave solo en el backend; sin shell en herramientas | Hecho | la clave va en un header y no se registra |
-| Costo: topes de iteraciones y de tokens configurables | Hecho | `.env.example`; pruebas |
-| Robustez: timeout con mensaje claro, un caso malo no frena al siguiente | Hecho | `gemini.ts`; demo |
-| Legibilidad: TypeScript sin `any` | Hecho | `bun run typecheck` |
-| Link público de prueba | **No hecho** | pendiente: Railway |
-| Bonus `modulo/` | **No hecho** | opcional |
-| Diseño del portal (sección 5) | Hecho (documentado) | este archivo |
+| HU-1 Leer la solicitud | Hecho | `bun run demo`, herramienta `leer_solicitud` |
+| HU-2 Mapear al maestro | Hecho | `mapeo.ts`, demo (en Ecuador el RUC queda por confirmar) |
+| HU-3 Excel, PDF y portal | Hecho | `formulario.xlsx` (CO, HN), `formulario.pdf` (EC), `valores-portal.md` (PA) |
+| HU-4 Paquete para firma | Hecho | `out/<caso>/paquete/`, `estado.json` |
+| HU-4 Pregunta de confirmación y envío simulado | Hecho | prompt, `simular_envio` y pruebas |
+| HU-5 Errores controlados | Hecho | pruebas automáticas |
+| RN1 a RN5 | Hecho | pruebas y demo |
+| Un comando para arrancar | Hecho | `bun run dev` |
+| `demo.ts` determinista y sin clave | Hecho | `bun run demo` |
+| Seguridad de la clave | Hecho | solo en el backend, por header, fuera de logs y respuestas |
+| Topes de pasos y de tokens | Hecho | `.env.example`, pruebas |
+| Timeout y un caso malo no frena al siguiente | Hecho | `gemini.ts`, demo |
+| TypeScript sin `any` | Hecho | `bun run typecheck` |
+| Link público de prueba | No hecho | falta el despliegue |
+| Bonus `modulo/` | No hecho | opcional |
 
-**Qué falta para producción:** leer plantillas reales (.xlsx, .pdf, OCR) en vez de JSON ya extraído; autenticación en el link público y límites por usuario; guardar sesiones y resultados en un almacenamiento persistente (en Railway el disco se borra al redeplegar); un plan de pago del modelo; firma electrónica (fase posterior); un dueño del dato para mantener al día el maestro y los soportes.
+Lo que falta para producción: leer plantillas reales (.xlsx, .pdf, OCR) en lugar de JSON ya extraído, autenticación y límites por usuario en el link público, guardar sesiones y resultados en un almacenamiento persistente (el disco de la nube se borra al redesplegar), un plan de pago del modelo, la firma electrónica en una fase posterior, y un responsable de mantener al día el maestro y los soportes.
 
 ## 9. Uso de IA
 
-- **Claude (Anthropic, en una sesión de Claude Code):** escribió el código y esta documentación siguiendo el análisis y las decisiones de Juan David. Juan revisó cada entrega, la ejecutó en su máquina y reportó los fallos que Claude corrigió.
-- **Gemini (Google):** es el modelo que usa el agente en tiempo de ejecución.
-- **Qué se descartó de lo propuesto:** `gemini-3.8-flash` y `gemini-3.1-flash-lite` como principal (picos de latencia); un paquete de portal que decía "formulario firmado" y adjuntaba datos bancarios (se corrigió); depender del prompt para la confirmación (se movió al código); Docker (no hacía falta). _Juan: agrega aquí lo que tú descartaste o cambiaste por tu cuenta._
-- **Qué se verificó a mano:** las salidas de `bun run demo`, los archivos generados (celdas del Excel, campos del PDF) y las respuestas reales del chat contra los fixtures.
+Usé Claude (de Anthropic, en una sesión de Claude Code) para escribir el código y esta documentación. Yo definí qué se hacía y por qué, revisé cada entrega, la corrí en mi máquina y reporté los fallos que se corrigieron. El agente usa Gemini (de Google) como modelo en tiempo de ejecución.
 
-## 10. Riesgos y mitigación
+De lo que se propuso descarté o cambié:
 
-| Riesgo | Mitigación |
+- `gemini-3.8-flash` y `gemini-3.1-flash-lite` como modelo principal, por los picos de latencia.
+- Un paquete de portal que decía "formulario firmado" y adjuntaba datos bancarios; se corrigió.
+- Depender del prompt para la confirmación del envío; se pasó al código.
+- Docker, que no hacía falta.
+
+Escribe aquí lo que tú descartaste o cambiaste por tu cuenta: ____
+
+Lo que verifiqué a mano: la salida de `bun run demo`, los archivos generados (celdas del Excel y campos del PDF) y las respuestas reales del chat contra los fixtures.
+
+## 10. Riesgos
+
+| Riesgo | Cómo lo mitigaría |
 |---|---|
-| El modelo inventa un valor | Los valores salen solo de las herramientas; el prompt prohíbe valores fuera del mapeo; el panel "Expediente" muestra los valores reales sin pasar por el modelo |
-| Plantillas reales peores que las de prueba | Añadir lectura real de xlsx/pdf con revisión humana de lo extraído |
-| Maestro o soportes desactualizados | Asignar un dueño del dato y alertar vigencias próximas a vencer |
-| Gasto de la clave desde un link público | Topes por sesión (ya hechos); falta autenticación y límite por usuario |
-| Nivel gratuito: límites de uso y uso de prompts por Google | Pasar a un plan de pago antes de usar datos reales |
-| Portales con CAPTCHA o MFA | El humano opera el portal; el agente solo prepara los valores |
-| Se pierden resultados al redeplegar (disco efímero) | Almacenamiento persistente (volumen o almacenamiento de objetos) |
-| Cambios en la API de Gemini (formato de herramientas, Interactions API) | Adaptador aislado en `src/llm/`; pruebas con respuestas simuladas |
+| El modelo inventa un valor | Los valores salen solo de las herramientas, el prompt prohíbe valores fuera del mapeo y el expediente muestra los valores reales sin pasar por el modelo |
+| Plantillas reales peores que las de prueba | Leer xlsx y pdf reales, con revisión humana de lo extraído |
+| Maestro o soportes desactualizados | Un responsable del dato y alertas de vigencias por vencer |
+| Gasto de la clave desde un link público | Los topes por sesión ya están; falta autenticación y un límite por usuario |
+| Límites del nivel gratuito y uso de prompts por Google | Pasar a un plan de pago antes de usar datos reales |
+| Portales con CAPTCHA o MFA | Opera la analista; el agente solo prepara los valores |
+| Se pierden resultados al redesplegar | Almacenamiento persistente (volumen o almacenamiento de objetos) |
+| Cambios en la API de Gemini | Adaptador aislado en `src/llm/` y pruebas con respuestas simuladas |
 
----
+## Anexo: cómo se construyó
 
-## Anexo: bitácora de construcción
-
-1. **Lectura del PRD** y análisis de entregables antes de tocar código; decisiones de stack (Bun, TypeScript, zod, Gemini).
-2. **Fixtures y herramientas** (`datos`, `mapeo`, `formularios`, `proveedor`): primero determinista y probado con `demo.ts` sin modelo.
-3. **Corrección del paquete de portal:** el correo decía "formulario firmado" y adjuntaba `valores-portal.md` con datos bancarios; el estado decía "listo para firma". Se corrigió con una etapa `carga en portal`.
-4. **Fecha de ejecución:** se fijó en 2026-09-03 para que el demo sea reproducible; después también en el chat y el servidor.
-5. **Elección del modelo:** prueba empírica de tres modelos y diseño de timeout y respaldo.
-6. **Agente:** adaptador de Gemini, ciclo, confirmación en código, enmascarado de datos bancarios y pruebas con modelo simulado.
-7. **Front:** casos, chat y expediente calculado sin el modelo.
-8. **Hallazgos al probar:** el panel mostraba estados viejos de otra fecha (ahora `estado.json` guarda su fecha y el panel avisa); un `useEffect` devolvía un valor y rompía la pantalla (`destroy is not a function`); un test dependía de que `out/` ya tuviera un paquete (ahora lo arma él).
-9. **Cierre contra el PRD:** se detectaron dos requisitos incompletos (un solo comando para front y backend, y tope de tokens por sesión) y se corrigieron.
+1. Leí el PRD y analicé los entregables antes de escribir código; elegí el stack (Bun, TypeScript, zod, Gemini).
+2. Hice primero las herramientas deterministas y las probé con `demo.ts`, sin modelo.
+3. Corregí el paquete de portal: el correo decía "formulario firmado", adjuntaba datos bancarios y el estado decía "listo para firma".
+4. Fijé la fecha de ejecución en 2026-09-03 para que el demo sea reproducible, y después también en el chat y el servidor.
+5. Probé tres modelos y diseñé el timeout y el respaldo.
+6. Construí el agente: adaptador de Gemini, ciclo, confirmación en el código, enmascarado de datos bancarios y pruebas con un modelo simulado.
+7. Hice el front: casos, chat y expediente calculado sin el modelo.
+8. Al probar encontré tres cosas. El panel mostraba estados viejos calculados con otra fecha (ahora `estado.json` guarda su fecha y el panel avisa). Un `useEffect` devolvía un valor y rompía la pantalla. Un test dependía de que `out/` ya tuviera un paquete. También el agente repetía llamadas iguales y no sabía explicar cómo se envía un caso de portal; ahora reutiliza resultados y tiene esa parte en su conocimiento.
+9. Revisé el PRD punto por punto y completé dos requisitos que faltaban: un solo comando para front y backend, y el tope de tokens por sesión.

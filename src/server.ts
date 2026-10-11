@@ -32,7 +32,9 @@ Bun.serve({
       const etiquetas = (leida.data.campos as { etiqueta: string }[]).map((c) => c.etiqueta)
       const mapeo = JSON.parse(await ejecutar("proveedor_mapear_campos", { caso: caso.data, campos: etiquetas }, ctx, false))
       const estado = await Bun.file(join(rutaOutCaso(ctx, caso.data), "estado.json")).json().catch(() => null)
-      const archivos = await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: join(rutaOutCaso(ctx, caso.data), "paquete") })).catch(() => [])
+      const todos = await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: rutaOutCaso(ctx, caso.data) })).catch(() => [] as string[])
+      // Se muestran el formulario, los valores de portal, el paquete y el envío simulado; no los registros internos.
+      const archivos = todos.map((a) => a.replaceAll("\\", "/")).filter((a) => !a.endsWith("log.jsonl") && a !== "estado.json").sort()
       // Un estado calculado con otra fecha de ejecución ya no es confiable: el panel pide reprocesar.
       const obsoleto = estado !== null && estado.fecha !== fechaEjecucion()
       return json({ solicitud: leida.data, mapeo: mapeo.data, estado, obsoleto, archivos })
