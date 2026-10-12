@@ -3,17 +3,16 @@ import { appendFile, mkdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { z } from "zod"
 
-// Lo que el servidor (o demo.ts) le entrega a cada herramienta.
-// directory = raíz del proyecto. Todas las rutas se arman desde aquí.
+// Contexto de cada herramienta: directory es la raíz del proyecto.
 export type Ctx = { directory: string; sessionId: string }
 
-// Error "esperado": lleva un mensaje claro para la analista, sin traza.
+// Error esperado, con mensaje claro para la analista.
 export class ErrorHerramienta extends Error {}
 
-// Mensaje exacto que pide el PRD cuando se intenta enviar sin confirmar.
+// Mensaje del PRD cuando se intenta enviar sin confirmar.
 export const MENSAJE_SIN_CONFIRMACION = "requiere confirmación explícita"
 
-// Lo que devuelve la lógica de cada herramienta cuando todo sale bien.
+// Resultado de una herramienta que salió bien.
 export type Resultado = { data: unknown; resumen: string }
 
 // ---------- Rutas ----------
@@ -33,8 +32,7 @@ export const rutaOutCaso = (ctx: Ctx, caso: string) => join(rutasBase(ctx).out, 
 
 // ---------- Fecha ----------
 
-// Fecha contra la que se compara la vigencia de los soportes (YYYY-MM-DD).
-// Se puede fijar con la variable FECHA_EJECUCION; si no, es la fecha de hoy.
+// Fecha para validar vigencias (AAAA-MM-DD): FECHA_EJECUCION o la de hoy.
 export function fechaEjecucion(): string {
   const fijada = process.env.FECHA_EJECUCION
   if (fijada && /^\d{4}-\d{2}-\d{2}$/.test(fijada)) return fijada
@@ -43,7 +41,7 @@ export function fechaEjecucion(): string {
 
 // ---------- Textos y datos ----------
 
-// "Identificación Tributaria " -> "identificacion tributaria" (para comparar etiquetas)
+// Normaliza una etiqueta: sin tildes, en minúsculas y sin espacios extra.
 export function normalizar(texto: string): string {
   return texto
     .normalize("NFD")
@@ -53,7 +51,7 @@ export function normalizar(texto: string): string {
     .replace(/\s+/g, " ")
 }
 
-// obtenerPorRuta(maestro, "banco.numero_cuenta") -> maestro.banco.numero_cuenta
+// Lee un valor anidado: obtenerPorRuta(maestro, "banco.numero_cuenta").
 export function obtenerPorRuta(obj: unknown, ruta: string): unknown {
   let actual: unknown = obj
   for (const clave of ruta.split(".")) {
@@ -63,7 +61,7 @@ export function obtenerPorRuta(obj: unknown, ruta: string): unknown {
   return actual
 }
 
-// Lee un JSON y lo valida con un esquema zod. Si algo falla, lanza un mensaje claro.
+// Lee un JSON y lo valida con zod; si falla, lanza un mensaje claro.
 export async function leerJson<S extends z.ZodType>(
   ruta: string,
   esquema: S,
@@ -112,7 +110,7 @@ async function registrar(
       await appendFile(join(rutaOutCaso(ctx, caso), "log.jsonl"), linea) // log por caso (RN5)
     }
   } catch {
-    // Un fallo al escribir el log nunca debe romper la herramienta.
+    // Un fallo del log no rompe la herramienta.
   }
 }
 
@@ -126,10 +124,8 @@ function extraerCaso(args: unknown): string | undefined {
 
 // ---------- Contrato de herramienta ----------
 
-// Convierte la lógica de una herramienta en el objeto { description, args, execute }
-// que pide el PRD. Aquí se garantiza que execute:
-//   1) valida los argumentos con zod, 2) nunca lanza, 3) devuelve un string JSON
-//   con { ok: true, data } o { ok: false, error }, 4) deja registro en el log.
+// Crea la herramienta { description, args, execute }: valida con zod, nunca lanza,
+// devuelve JSON { ok, data } o { ok: false, error } y registra el log.
 export function definirHerramienta<S extends z.ZodRawShape>(def: {
   nombre: string
   description: string

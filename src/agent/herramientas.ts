@@ -1,7 +1,7 @@
 import { z } from "zod"
 import type { DeclaracionHerramienta } from "../llm/adapter"
-import * as proveedor from "../tools/proveedor"
-import type { Ctx } from "../tools/util"
+import * as proveedor from "../../modulo/tools/proveedor"
+import type { Ctx } from "../../modulo/tools/util"
 
 type Herramienta = { description: string; args: z.ZodRawShape; execute: (args: unknown, ctx: Ctx) => Promise<string> }
 
@@ -10,7 +10,7 @@ const registro = new Map<string, Herramienta>(
   Object.entries(proveedor).map(([nombre, h]) => [`proveedor_${nombre}`, h as Herramienta]),
 )
 
-// Lo que ve el modelo: nombre, descripción y esquema de argumentos (generado desde zod).
+// Lo que ve el modelo: nombre, descripción y esquema de argumentos (desde zod).
 export function declaraciones(): DeclaracionHerramienta[] {
   return [...registro.entries()].map(([nombre, h]) => ({
     nombre,
@@ -19,8 +19,8 @@ export function declaraciones(): DeclaracionHerramienta[] {
   }))
 }
 
-// Ejecuta una herramienta pedida por el modelo. Nunca lanza.
-// `usuarioConfirmo` decide el valor de `confirmado`: el modelo NO puede confirmar por su cuenta.
+// Ejecuta una herramienta pedida por el modelo; nunca lanza.
+// `usuarioConfirmo` fija `confirmado`: el modelo no puede confirmar por su cuenta.
 export async function ejecutar(nombre: string, args: unknown, ctx: Ctx, usuarioConfirmo: boolean): Promise<string> {
   const herramienta = registro.get(nombre)
   if (!herramienta) return JSON.stringify({ ok: false, error: `La herramienta "${nombre}" no existe.` })

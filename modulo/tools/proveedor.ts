@@ -1,5 +1,4 @@
-// Las 5 herramientas del agente. Cada `export` se convierte en una herramienta
-// con el nombre proveedor_<export>. No exportes nada más desde este archivo.
+// Las 5 herramientas del agente (nombre: proveedor_<export>). No exportar nada más.
 import { existsSync } from "node:fs"
 import { copyFile, mkdir, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -31,8 +30,7 @@ import {
 
 // ---------- Piezas internas compartidas ----------
 
-// Carga el caso y calcula el mapeo. SIEMPRE se recalcula desde los archivos:
-// así el modelo nunca puede "colar" un valor propio en el formulario (CA2).
+// Carga el caso y recalcula el mapeo desde los archivos (el modelo no aporta valores).
 async function prepararCaso(ctx: Ctx, caso: string) {
   const datos = await cargarCaso(ctx, caso)
   const [maestro, glosario] = await Promise.all([cargarMaestro(ctx), cargarGlosario(ctx)])
@@ -75,7 +73,7 @@ type EstadoSoporte = {
   detalle: string
 }
 
-// RN3: compara cada soporte exigido contra el índice del repositorio y la fecha de ejecución.
+// Revisa cada soporte exigido contra el índice y la fecha de ejecución (RN3).
 async function revisarSoportes(ctx: Ctx, exigidos: string[], hoy: string): Promise<EstadoSoporte[]> {
   const indice = await cargarIndiceSoportes(ctx)
   const carpeta = rutasBase(ctx).soportes
@@ -86,7 +84,7 @@ async function revisarSoportes(ctx: Ctx, exigidos: string[], hoy: string): Promi
     if (!existsSync(join(carpeta, soporte.archivo))) {
       return { tipo, estado: "ausente", archivo: soporte.archivo, detalle: `El índice lo lista, pero falta el archivo ${soporte.archivo}.` }
     }
-    // Las fechas ISO (YYYY-MM-DD) se pueden comparar como texto.
+    // Las fechas ISO se comparan como texto.
     if (soporte.vigencia_hasta !== null && soporte.vigencia_hasta < hoy) {
       return { tipo, estado: "vencido", archivo: soporte.archivo, vigencia_hasta: soporte.vigencia_hasta, detalle: `Venció el ${soporte.vigencia_hasta}; hay que actualizarlo.` }
     }
@@ -104,7 +102,7 @@ const EsquemaEstadoPaquete = z.object({
   listo_para_firma: z.boolean(),
   bloqueos: z.array(z.string()),
   etapa: z.string(), // "firma" o "carga en portal"
-  fecha: z.string().optional(), // fecha de ejecución con la que se calculó (para detectar estados viejos)
+  fecha: z.string().optional(), // fecha con la que se calculó el estado
 })
 
 // ---------- Herramienta 1 (HU-1): leer la solicitud ----------
@@ -151,7 +149,7 @@ export const mapear_campos = definirHerramienta({
     const mapeo = mapearCampos(campos, solicitud.pais, glosario, maestro)
 
     return {
-      data: ocultarSensibles(mapeo), // al modelo no se le envían datos bancarios completos
+      data: ocultarSensibles(mapeo), // bancarios enmascarados
       resumen: `${mapeo.llenos.length} llenos, ${mapeo.faltantes.length} faltantes, ${mapeo.requiere_confirmacion.length} por confirmar.`,
     }
   },
@@ -190,11 +188,11 @@ export const armar_paquete = definirHerramienta({
     const solicitud = await cargarSolicitud(ctx, caso)
     const exigidos = await cargarSoportesExigidos(ctx, caso)
     const maestro = await cargarMaestro(ctx)
-    // En portal no hay formulario que firmar ni enviar: una persona carga todo en la web.
+    // Portal: no hay formulario que firmar; la analista carga todo en la web.
     const esPortal = solicitud.formato === "portal"
     const etapa = esPortal ? "carga en portal" : "firma"
 
-    // HU-5: si la plantilla está dañada no se frena todo; se arma lo demás y se avisa.
+    // Plantilla dañada: se arma lo demás y se avisa (HU-5).
     let formulario: FormularioCreado | undefined
     let errorFormulario: string | undefined
     let mapeo: Mapeo = { llenos: [], faltantes: [], requiere_confirmacion: [] }
@@ -209,7 +207,7 @@ export const armar_paquete = definirHerramienta({
 
     const soportes = await revisarSoportes(ctx, exigidos, hoy)
 
-    // RN3: soporte vencido o ausente bloquea; un campo faltante NO bloquea.
+    // Vencido o ausente bloquea; un campo faltante no (RN3).
     const bloqueos: string[] = []
     if (errorFormulario) bloqueos.push(`Formulario no generado: ${errorFormulario}`)
     for (const s of soportes) {
@@ -267,11 +265,11 @@ export const armar_paquete = definirHerramienta({
     ].join("\n")
     await writeFile(join(carpetaPaquete, "checklist.md"), checklist, "utf8")
 
-    // borrador-correo.md (RN2: aquí nunca van datos bancarios)
+    // borrador-correo.md (sin datos bancarios, RN2)
     const firmante = String(obtenerPorRuta(maestro, "representante_legal.nombre") ?? "")
     const cargo = String(obtenerPorRuta(maestro, "representante_legal.cargo") ?? "")
     const razonSocial = String(obtenerPorRuta(maestro, "razon_social") ?? "")
-    // En portal no se adjunta ningún formulario: valores-portal.md es de uso interno.
+    // Portal: valores-portal.md es interno, no se adjunta.
     const soportesPresentes = soportes.filter((s) => s.estado === "presente").map((s) => s.archivo)
     const adjuntos = [esPortal ? undefined : formulario?.archivo, ...soportesPresentes].filter((a): a is string => Boolean(a))
     const aviso = [
@@ -300,7 +298,7 @@ export const armar_paquete = definirHerramienta({
     ].join("\n")
     await writeFile(join(carpetaPaquete, "borrador-correo.md"), correo, "utf8")
 
-    // Estado para que proveedor_simular_envio sepa cómo quedó el paquete.
+    // Estado que lee simular_envio.
     await writeFile(join(carpetaCaso, "estado.json"), JSON.stringify({ listo_para_firma: listo, bloqueos, etapa, fecha: fechaEjecucion() }, null, 2), "utf8")
 
     return {
@@ -344,7 +342,7 @@ export const simular_envio = definirHerramienta({
     }
     const estado = await leerJson(join(carpetaCaso, "estado.json"), EsquemaEstadoPaquete, `out/${caso}/estado.json`)
 
-    // Se "envía" el formulario y los soportes; checklist, borrador y valores del portal son de uso interno.
+    // Se envían formulario y soportes; checklist, borrador y valores de portal son internos.
     const internos = ["checklist.md", "borrador-correo.md", "valores-portal.md"]
     const adjuntos = (await readdir(join(carpetaCaso, "paquete"))).filter((f) => !internos.includes(f)).sort()
 

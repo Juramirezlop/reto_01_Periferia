@@ -1,9 +1,9 @@
 import { ErrorModelo, type Adaptador, type Entrada } from "../llm/adapter"
-import type { Ctx } from "../tools/util"
+import type { Ctx } from "../../modulo/tools/util"
 import { declaraciones, ejecutar } from "./herramientas"
 import { confirmaEnvio } from "./sistema"
 
-// Último texto que escribió el agente (sirve para entender un "sí" de la analista).
+// Último texto del agente (para entender un "sí" de la analista).
 const ultimoTextoDelAgente = (historial: Entrada[]) =>
   [...historial].reverse().find((e): e is Extract<Entrada, { tipo: "modelo" }> => e.tipo === "modelo" && e.texto !== "")?.texto ?? ""
 
@@ -13,12 +13,12 @@ export type Resultado = { respuesta: string; herramientas: { nombre: string; ok:
 export type Sesion = { historial: Entrada[]; tokens: number }
 export type Limites = { maxPasos: number; maxTokens: number }
 
-// Un turno del agente: el usuario escribe -> el modelo pide herramientas -> se ejecutan -> repite -> respuesta.
-// `adaptadores` va en orden de preferencia: el primero es el principal, el resto son respaldo.
+// Un turno del agente: modelo -> herramientas -> modelo, hasta dar la respuesta.
+// `adaptadores` va en orden: el primero es el principal y los demás, respaldo.
 export async function responder(opciones: {
   adaptadores: Adaptador[]
   sistema: string
-  sesion: Sesion // se modifica: así la conversación recuerda lo anterior y lo gastado
+  sesion: Sesion // se actualiza en cada turno
   limites: Limites
   mensaje: string
   ctx: Ctx
@@ -26,7 +26,7 @@ export async function responder(opciones: {
   const { adaptadores, sistema, sesion, limites, mensaje, ctx } = opciones
   const { historial } = sesion
   const usadas: Resultado["herramientas"] = []
-  const yaEjecutadas = new Map<string, string>() // "herramienta + argumentos" -> resultado, para no repetir en el mismo mensaje
+  const yaEjecutadas = new Map<string, string>() // llamada -> resultado, para no repetirla en el mismo mensaje
   const confirmo = confirmaEnvio(mensaje, ultimoTextoDelAgente(historial))
   historial.push({ tipo: "usuario", texto: mensaje })
 
@@ -34,7 +34,7 @@ export async function responder(opciones: {
     if (sesion.tokens >= limites.maxTokens) {
       return { respuesta: "Esta conversación alcanzó su límite de uso. Pulsa ↺ para empezar una nueva.", herramientas: usadas, tokens: sesion.tokens }
     }
-    // Probamos cada modelo hasta que uno responda.
+    // Prueba cada modelo hasta que uno responda.
     let respuesta
     let ultimoError = "sin modelos configurados"
     for (const adaptador of adaptadores) {
@@ -43,7 +43,7 @@ export async function responder(opciones: {
         break
       } catch (e) {
         ultimoError = e instanceof Error ? e.message : String(e)
-        if (!(e instanceof ErrorModelo && e.reintentable)) break // errores como clave inválida no se arreglan con el respaldo
+        if (!(e instanceof ErrorModelo && e.reintentable)) break // con un error como clave inválida el respaldo no ayuda
       }
     }
     if (!respuesta) {
@@ -55,7 +55,7 @@ export async function responder(opciones: {
     if (respuesta.llamadas.length === 0) return { respuesta: respuesta.texto, herramientas: usadas, tokens: sesion.tokens }
 
     for (const llamada of respuesta.llamadas) {
-      // Si el modelo repite exactamente la misma llamada, se reutiliza el resultado (ahorra tiempo y registros duplicados).
+      // Si el modelo repite la misma llamada, se reutiliza el resultado.
       const clave = `${llamada.nombre}:${JSON.stringify(llamada.args)}`
       const contenido = yaEjecutadas.get(clave) ?? (await ejecutar(llamada.nombre, llamada.args, ctx, confirmo))
       yaEjecutadas.set(clave, contenido)

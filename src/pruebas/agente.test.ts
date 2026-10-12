@@ -5,7 +5,8 @@ import { join } from "node:path"
 import { beforeAll, describe, expect, test } from "bun:test"
 import { responder, type Sesion } from "../agent/loop"
 import { ejecutar } from "../agent/herramientas"
-import { confirmaEnvio } from "../agent/sistema"
+import { confirmaEnvio, construirSistema } from "../agent/sistema"
+import { prepararCasos } from "../preparar"
 import { ErrorModelo, type Adaptador, type Entrada, type Llamada } from "../llm/adapter"
 import { crearGemini } from "../llm/gemini"
 
@@ -196,5 +197,45 @@ describe("ahorro de llamadas", () => {
     const despues = (await Bun.file(registro).text()).split("\n").filter((l) => l.includes("leer_solicitud")).length
     expect(despues - antes).toBe(1)
     expect(r.herramientas.length).toBe(2) // se informan las dos llamadas, pero solo una se ejecutó
+  })
+})
+
+describe("módulo exportable (modulo/)", () => {
+  test("las herramientas se importan sin el servidor y son las 5 del contrato", async () => {
+    const herramientas = await import("../../modulo/tools/proveedor")
+    expect(Object.keys(herramientas).sort()).toEqual(["armar_paquete", "generar_formulario", "leer_solicitud", "mapear_campos", "simular_envio"])
+    for (const h of Object.values(herramientas)) {
+      expect(typeof h.description).toBe("string")
+      expect(typeof h.execute).toBe("function")
+    }
+  })
+
+  test("el sistema del agente usa el mismo prompt y conocimiento que modulo/ (sin copias)", async () => {
+    const quitar = (t: string) => t.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "")
+    const prompt = quitar(await Bun.file(join(ctx.directory, "modulo", "agent.md")).text())
+    const skill = quitar(await Bun.file(join(ctx.directory, "modulo", "skill", "registro-proveedor", "SKILL.md")).text())
+    const sistema = await construirSistema(ctx)
+    expect(sistema).toContain(prompt.trim())
+    expect(sistema).toContain(skill.trim())
+    expect(sistema).not.toContain("mode: primary") // los metadatos no llegan al modelo
+  })
+
+  test("agent.md y SKILL.md traen los metadatos que pide el PRD", async () => {
+    const agente = await Bun.file(join(ctx.directory, "modulo", "agent.md")).text()
+    expect(agente).toMatch(/^---\r?\n[\s\S]*description:[\s\S]*mode: primary[\s\S]*edit: deny[\s\S]*bash: deny[\s\S]*---/)
+    const skill = await Bun.file(join(ctx.directory, "modulo", "skill", "registro-proveedor", "SKILL.md")).text()
+    expect(skill).toMatch(/^---\r?\nname: registro-proveedor\r?\ndescription:/)
+  })
+})
+
+describe("preparación al arrancar", () => {
+  test("arma los paquetes que faltan y no repite los que ya están al día", async () => {
+    rmSync(join(ctx.directory, "out"), { recursive: true, force: true })
+    expect((await prepararCasos()).length).toBe(4)
+    for (const caso of ["co-industrias-delta", "pa-logistica-istmo"]) {
+      const estado = await Bun.file(join(ctx.directory, "out", caso, "estado.json")).json()
+      expect(estado.listo_para_firma).toBe(true)
+    }
+    expect(await prepararCasos()).toEqual([]) // segunda vez: nada que hacer
   })
 })

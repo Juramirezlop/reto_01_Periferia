@@ -4,13 +4,14 @@ import { join, resolve, sep } from "node:path"
 import { z } from "zod"
 import { manejarMensaje, reiniciarSesion } from "./app"
 import { config } from "./config"
+import { prepararCasos } from "./preparar"
 import { ejecutar } from "./agent/herramientas"
-import { fechaEjecucion, rutaOutCaso, rutasBase } from "./tools/util"
-import { nombreCaso } from "./tools/datos"
+import { fechaEjecucion, rutaOutCaso, rutasBase } from "../modulo/tools/util"
+import { nombreCaso } from "../modulo/tools/datos"
 
 const EsquemaChat = z.object({ sessionId: z.string().min(1).max(64), mensaje: z.string().min(1).max(4000) })
 const json = (datos: unknown, status = 200) => Response.json(datos, { status })
-const dirWeb = join(process.cwd(), "web", "dist") // el front compilado (paso siguiente)
+const dirWeb = join(process.cwd(), "web", "dist") // front compilado
 
 Bun.serve({
   port: config.puerto,
@@ -21,7 +22,7 @@ Bun.serve({
       return json({ ok: true, modelo: config.modelo, clave: Boolean(config.apiKey), fecha: fechaEjecucion() })
     }
 
-    // Vista del caso para el panel: calculada solo con las herramientas (sin modelo).
+    // Vista del caso para el panel, calculada con las herramientas (sin modelo).
     const rutaCaso = pathname.match(/^\/api\/caso\/([^/]+)$/)
     if (rutaCaso) {
       const ctx = { directory: process.cwd(), sessionId: "panel" }
@@ -33,14 +34,14 @@ Bun.serve({
       const mapeo = JSON.parse(await ejecutar("proveedor_mapear_campos", { caso: caso.data, campos: etiquetas }, ctx, false))
       const estado = await Bun.file(join(rutaOutCaso(ctx, caso.data), "estado.json")).json().catch(() => null)
       const todos = await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: rutaOutCaso(ctx, caso.data) })).catch(() => [] as string[])
-      // Se muestran el formulario, los valores de portal, el paquete y el envío simulado; no los registros internos.
+      // Se listan los archivos generados, no los registros internos.
       const archivos = todos.map((a) => a.replaceAll("\\", "/")).filter((a) => !a.endsWith("log.jsonl") && a !== "estado.json").sort()
-      // Un estado calculado con otra fecha de ejecución ya no es confiable: el panel pide reprocesar.
+      // Un estado calculado con otra fecha ya no es confiable.
       const obsoleto = estado !== null && estado.fecha !== fechaEjecucion()
       return json({ solicitud: leida.data, mapeo: mapeo.data, estado, obsoleto, archivos })
     }
 
-    // Descarga de un archivo generado, siempre dentro de out/<caso>/
+    // Descarga de un archivo generado, solo dentro de out/<caso>/
     const rutaArchivo = pathname.match(/^\/api\/archivo\/([^/]+)\/(.+)$/)
     if (rutaArchivo) {
       const caso = nombreCaso.safeParse(rutaArchivo[1])
@@ -68,10 +69,12 @@ Bun.serve({
       return json({ ok: true })
     }
 
-    // Archivos del front (si ya está compilado)
+    // Archivos del front compilado
     const archivo = join(dirWeb, pathname === "/" ? "index.html" : pathname)
     if (archivo.startsWith(dirWeb) && existsSync(archivo)) return new Response(Bun.file(archivo))
     return json({ error: "No encontrado" }, 404)
   },
 })
 console.log(`Servidor en http://localhost:${config.puerto}  (modelo: ${config.modelo})`)
+const preparados = await prepararCasos()
+if (preparados.length) console.log(`Casos preparados al arrancar: ${preparados.join(", ")}`)

@@ -1,5 +1,4 @@
-// Contrato entre el agente y CUALQUIER modelo. Si mañana se usa otro proveedor,
-// solo se escribe otro archivo que cumpla `Adaptador`; el ciclo del agente no cambia.
+// Contrato entre el agente y cualquier modelo: otro proveedor solo necesita cumplir `Adaptador`.
 
 // Declaración de una herramienta tal como la ve el modelo.
 export type DeclaracionHerramienta = {
@@ -11,10 +10,10 @@ export type DeclaracionHerramienta = {
 // Una petición del modelo para ejecutar una herramienta.
 export type Llamada = { nombre: string; args: unknown }
 
-// Historial de la conversación, en un formato neutral.
+// Historial de la conversación en formato neutral.
 export type Entrada =
   | { tipo: "usuario"; texto: string }
-  // `crudo` es el mensaje original del proveedor: Gemini 3 exige devolverlo intacto (firmas de razonamiento).
+  // `crudo`: mensaje original del proveedor; Gemini 3 pide devolverlo intacto.
   | { tipo: "modelo"; texto: string; llamadas: Llamada[]; crudo?: unknown }
   | { tipo: "resultado"; nombre: string; contenido: string }
 
@@ -24,7 +23,7 @@ export type Adaptador = {
   generar(entrada: { sistema: string; historial: Entrada[]; herramientas: DeclaracionHerramienta[] }): Promise<RespuestaModelo>
 }
 
-// Error del modelo que justifica probar el modelo de respaldo.
+// Error del modelo; si es reintentable se prueba el respaldo.
 export class ErrorModelo extends Error {
   constructor(
     mensaje: string,

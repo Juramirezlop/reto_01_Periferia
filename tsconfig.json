@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["bun"]
   },
-  "include": ["src", "demo.ts"]
+  "include": ["src", "modulo", "demo.ts"]
 }

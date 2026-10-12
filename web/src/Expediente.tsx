@@ -1,6 +1,6 @@
 import { urlArchivo, type VistaCaso } from "./api"
 
-// El valor se muestra tal como lo entrega el servidor (los datos bancarios ya vienen enmascarados).
+// Texto del valor (los datos bancarios ya vienen enmascarados).
 const texto = (v: unknown) => (typeof v === "object" ? JSON.stringify(v) : String(v))
 
 export function Expediente({ caso, vista }: { caso: string; vista: VistaCaso }) {
@@ -8,7 +8,7 @@ export function Expediente({ caso, vista }: { caso: string; vista: VistaCaso }) 
   const total = llenos.length + confirmar.length + faltantes.length || 1
   const estado = vista.estado
 
-  // Cada campo en el orden en que lo pide el cliente, con su estado.
+  // Campos en el orden del cliente, con su estado.
   const filas = vista.solicitud.campos.map((c) => {
     const lleno = llenos.find((l) => l.etiqueta === c.etiqueta)
     const conf = confirmar.find((l) => l.etiqueta === c.etiqueta)
@@ -27,7 +27,7 @@ export function Expediente({ caso, vista }: { caso: string; vista: VistaCaso }) 
         <p>{vista.solicitud.pais} · formato {vista.solicitud.formato}</p>
       </div>
 
-      {/* key = clase: al cambiar de estado el sello se vuelve a estampar */}
+      {/* key = clase: el sello se vuelve a estampar al cambiar de estado */}
       <div key={sello.clase + caso} className={`sello ${sello.clase}`}>{sello.texto}</div>
 
       {vista.obsoleto && <p className="aviso">Este estado se calculó con otra fecha de ejecución. Pídele al agente que procese el caso otra vez.</p>}

@@ -3,9 +3,9 @@ import { construirSistema } from "./agent/sistema"
 import { config } from "./config"
 import type { Adaptador } from "./llm/adapter"
 import { crearGemini } from "./llm/gemini"
-import type { Ctx } from "./tools/util"
+import type { Ctx } from "../modulo/tools/util"
 
-// Una conversación por sessionId, en memoria (el PRD no pide base de datos).
+// Una conversación por sessionId, en memoria.
 const sesiones = new Map<string, Sesion>()
 
 function adaptadoresPorDefecto(): Adaptador[] {
@@ -18,7 +18,7 @@ export async function manejarMensaje(
   sessionId: string,
   mensaje: string,
   directory = process.cwd(),
-  adaptadoresPrueba?: Adaptador[], // las pruebas inyectan un modelo simulado
+  adaptadoresPrueba?: Adaptador[], // permite inyectar un modelo simulado en las pruebas
 ): Promise<Resultado> {
   if (!adaptadoresPrueba && !config.apiKey) {
     return { respuesta: "Falta GEMINI_API_KEY en el archivo .env.", herramientas: [] }

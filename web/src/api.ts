@@ -1,4 +1,4 @@
-// Tipos y llamadas al servidor. Los tipos reflejan lo que devuelven las herramientas.
+// Tipos y llamadas al servidor.
 export type Lleno = { etiqueta: string; ruta: string; valor: unknown }
 export type PorConfirmar = Lleno & { confianza: number; nota: string }
 export type Faltante = { etiqueta: string; motivo: string }
@@ -7,7 +7,7 @@ export type VistaCaso = {
   solicitud: { pais: string; cliente: string; formato: string; campos: { etiqueta: string; obligatorio?: boolean }[]; soportes: string[] }
   mapeo: { llenos: Lleno[]; faltantes: Faltante[]; requiere_confirmacion: PorConfirmar[] }
   estado: { listo_para_firma: boolean; bloqueos: string[]; etapa: string } | null // null = paquete sin armar
-  obsoleto: boolean // el estado se calculó con otra fecha de ejecución
+  obsoleto: boolean // estado calculado con otra fecha
   archivos: string[]
 }
 

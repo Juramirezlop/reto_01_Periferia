@@ -4,7 +4,7 @@ import { Chat, type Mensaje } from "./Chat"
 import { Expediente } from "./Expediente"
 import { Ventana } from "./Ventana"
 
-type Vista = "casos" | "chat" | "expediente" // en pantallas pequeñas se muestra una sola
+type Vista = "casos" | "chat" | "expediente" // en pantallas pequeñas se muestra una
 
 export function App() {
   const sessionId = useRef(crypto.randomUUID()).current
@@ -17,7 +17,7 @@ export function App() {
   const [vista, setVista] = useState<Vista>("chat")
   const [enfocarChat, setEnfocarChat] = useState(false)
 
-  // Trae (o refresca) la vista de un caso. Si el servidor falla, se conserva la anterior.
+  // Trae o refresca la vista de un caso; si falla, conserva la anterior.
   const cargarCaso = useCallback(async (caso: string) => {
     try {
       const v = await obtenerCaso(caso)
@@ -47,7 +47,7 @@ export function App() {
       setMensajes((m) => [...m, { rol: "agente", texto: `No pude hablar con el servidor: ${e instanceof Error ? e.message : e}`, herramientas: [], error: true }])
     }
     setTrabajando(false)
-    casos.forEach(cargarCaso) // el agente pudo armar paquetes: se refresca el expediente
+    casos.forEach(cargarCaso) // refresca el expediente por si el agente armó paquetes
   }
 
   async function nueva() {

@@ -19,13 +19,13 @@ flowchart LR
     E --> G[(out/caso<br/>salida)]
 ```
 
-El panel de la derecha de la pantalla (el expediente) no usa el modelo: llama directamente a las herramientas, así que siempre muestra el estado real del caso aunque Gemini falle.
+El panel de la derecha de la pantalla (el expediente) no usa el modelo: llama directamente a las herramientas, así que siempre muestra el estado real del caso aunque Gemini falle. Al arrancar, el servidor arma los paquetes que falten o que se hayan calculado con otra fecha (`src/preparar.ts`), con las mismas herramientas, para que el panel no quede vacío y no haya que correr el demo antes.
 
 Dónde vive cada cosa:
 
-- El prompt está en `agent/prompt.md`.
-- El conocimiento del proceso está en `src/knowledge/registro-proveedor.md` y se une al prompt en `src/agent/sistema.ts`.
-- Las herramientas están en `src/tools/proveedor.ts`. Leer los archivos, mapear los campos y generar los formularios están en `datos.ts`, `mapeo.ts` y `formularios.ts`.
+- El prompt está en `modulo/agent.md` (sus metadatos son los que pide el PRD; `src/agent/sistema.ts` los quita antes de enviarlo al modelo).
+- El conocimiento del proceso está en `modulo/skill/registro-proveedor/SKILL.md` y se une al prompt en `src/agent/sistema.ts`.
+- Las herramientas están en `modulo/tools/proveedor.ts`. Leer los archivos, mapear los campos y generar los formularios están en `datos.ts`, `mapeo.ts` y `formularios.ts`, en la misma carpeta.
 - El ciclo del agente está en `src/agent/loop.ts`.
 - La conexión con el modelo está en `src/llm/` (un contrato en `adapter.ts` y la implementación de Gemini en `gemini.ts`).
 
@@ -98,7 +98,8 @@ flowchart LR
 3. Un adaptador propio con `fetch` sobre `generateContent` de Gemini. Descarté el SDK oficial y la Interactions API (la que Google recomienda hoy) porque así controlo el timeout, el respaldo y las firmas de razonamiento de Gemini 3 en unas cien líneas. El costo es que yo mantengo la compatibilidad; migrar a Interactions API queda pendiente.
 4. Confirmación aplicada en el código. Descarté confiar solo en el prompt porque un prompt se puede ignorar. El costo es que detectar "confirmo" por patrones es conservador: ante la duda, el agente vuelve a pedir confirmación.
 5. Sin base de datos, tal como pide el PRD. Las sesiones viven en memoria y los resultados en `out/`. Se pierden al reiniciar el servidor.
-6. Un front en React con el expediente calculado sin el modelo, en lugar de un HTML simple. Así se ve el estado real del caso aunque el modelo falle y la analista descarga los archivos sin tener acceso al disco del servidor.
+6. El módulo exportable (`modulo/`) es la fuente de verdad y la app lo usa: el prompt, el conocimiento y las herramientas viven ahí y el servidor los importa o los lee desde ahí. Descarté mantener una copia aparte para el módulo porque las dos se desfasarían. El costo es que la app depende de esa carpeta.
+7. Un front en React con el expediente calculado sin el modelo, en lugar de un HTML simple. Así se ve el estado real del caso aunque el modelo falle y la analista descarga los archivos sin tener acceso al disco del servidor.
 
 ## 7. Supuestos
 
@@ -128,7 +129,7 @@ flowchart LR
 | Timeout y un caso malo no frena al siguiente | Hecho | `gemini.ts`, demo |
 | TypeScript sin `any` | Hecho | `bun run typecheck` |
 | Link público de prueba | No hecho | falta el despliegue |
-| Bonus `modulo/` | No hecho | opcional |
+| Bonus `modulo/` | Hecho | `modulo/agent.md`, `modulo/tools/`, `modulo/skill/`; pruebas de que la app usa los mismos archivos |
 
 Lo que falta para producción: leer plantillas reales (.xlsx, .pdf, OCR) en lugar de JSON ya extraído, autenticación y límites por usuario en el link público, guardar sesiones y resultados en un almacenamiento persistente (el disco de la nube se borra al redesplegar), un plan de pago del modelo, la firma electrónica en una fase posterior, y un responsable de mantener al día el maestro y los soportes.
 
@@ -170,4 +171,5 @@ Lo que verifiqué a mano: la salida de `bun run demo`, los archivos generados (c
 6. Construí el agente: adaptador de Gemini, ciclo, confirmación en el código, enmascarado de datos bancarios y pruebas con un modelo simulado.
 7. Hice el front: casos, chat y expediente calculado sin el modelo.
 8. Al probar encontré tres cosas. El panel mostraba estados viejos calculados con otra fecha (ahora `estado.json` guarda su fecha y el panel avisa). Un `useEffect` devolvía un valor y rompía la pantalla. Un test dependía de que `out/` ya tuviera un paquete. También el agente repetía llamadas iguales y no sabía explicar cómo se envía un caso de portal; ahora reutiliza resultados y tiene esa parte en su conocimiento.
-9. Revisé el PRD punto por punto y completé dos requisitos que faltaban: un solo comando para front y backend, y el tope de tokens por sesión.
+9. Armé el módulo exportable moviendo el prompt, el conocimiento y las herramientas a `modulo/`, y haciendo que la app los use desde ahí. También hice que el servidor prepare los casos al arrancar, porque sin eso había que correr `bun run demo` antes de ver el panel completo, y recorté los comentarios del código a una línea cada uno.
+10. Revisé el PRD punto por punto y completé dos requisitos que faltaban: un solo comando para front y backend, y el tope de tokens por sesión.

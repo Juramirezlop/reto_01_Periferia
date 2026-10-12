@@ -1,3 +1,7 @@
+---
+name: registro-proveedor
+description: Conocimiento del proceso de registro como proveedor: reglas por país, soportes, formatos (Excel, PDF, portal) y quién hace qué. Úsalo al procesar o explicar un caso.
+---
 # Conocimiento del proceso de registro
 
 ## Qué es un caso

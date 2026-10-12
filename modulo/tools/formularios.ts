@@ -15,7 +15,7 @@ export function textoValor(valor: unknown): string {
 
 // ---------- Excel (P0) ----------
 
-// Escribe cada etiqueta y su valor en la hoja y celda EXACTAS que indica la plantilla.
+// Escribe cada etiqueta y valor en la celda exacta de la plantilla.
 export async function generarXlsx(campos: Campo[], valores: Map<string, unknown>, ruta: string): Promise<void> {
   const libro = new ExcelJS.Workbook()
 
@@ -27,11 +27,11 @@ export async function generarXlsx(campos: Campo[], valores: Map<string, unknown>
     celdaEtiqueta.value = campo.etiqueta
     celdaEtiqueta.font = { bold: true }
 
-    // Los números se escriben como número; lo demás como texto. Sin valor: celda vacía.
+    // Número como número, lo demás como texto; sin valor, celda vacía.
     const valor = valores.get(campo.etiqueta)
     hoja.getCell(campo.celda_valor).value = typeof valor === "number" ? valor : textoValor(valor) || null
 
-    // Ancho de columnas: la letra es lo que va antes del número (B3 -> B).
+    // Ancho de columna según la letra de la celda.
     hoja.getColumn(campo.celda_etiqueta.replace(/\d+/g, "")).width = 34
     hoja.getColumn(campo.celda_valor.replace(/\d+/g, "")).width = 48
   }
@@ -41,7 +41,7 @@ export async function generarXlsx(campos: Campo[], valores: Map<string, unknown>
 
 // ---------- PDF (P1) ----------
 
-// PDF generado (no AcroForm): una línea por campo, en el orden de la plantilla.
+// PDF generado: una línea por campo, en el orden de la plantilla.
 export function generarPdf(
   titulo: string,
   campos: Campo[],
@@ -73,7 +73,7 @@ export function generarPdf(
   })
 }
 
-// ---------- Portal web (P2): no se automatiza, solo se dejan los valores para copiar ----------
+// ---------- Portal web (P2): solo deja los valores para copiar ----------
 
 export async function generarValoresPortal(
   cliente: string,

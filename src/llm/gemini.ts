@@ -5,26 +5,26 @@ const URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 type Parte = Record<string, unknown>
 type Contenido = { role: "user" | "model"; parts: Parte[] }
 
-// Gemini pide los tipos en MAYÚSCULAS (STRING, OBJECT...). Convierte el esquema JSON de zod.
+// Convierte el esquema JSON de zod al formato de Gemini (tipos en mayúsculas).
 function aEsquemaGemini(esquema: unknown): unknown {
   if (Array.isArray(esquema)) return esquema.map(aEsquemaGemini)
   if (typeof esquema !== "object" || esquema === null) return esquema
   const salida: Record<string, unknown> = {}
   for (const [clave, valor] of Object.entries(esquema)) {
-    if (clave === "$schema" || clave === "additionalProperties") continue // Gemini no los acepta
+    if (clave === "$schema" || clave === "additionalProperties") continue // no los acepta Gemini
     salida[clave] = clave === "type" && typeof valor === "string" ? valor.toUpperCase() : aEsquemaGemini(valor)
   }
   return salida
 }
 
-// Traduce nuestro historial neutral al formato de Gemini.
+// Traduce el historial neutral al formato de Gemini.
 function aContenidos(historial: Entrada[]): Contenido[] {
   const contenidos: Contenido[] = []
   for (const e of historial) {
     if (e.tipo === "usuario") {
       contenidos.push({ role: "user", parts: [{ text: e.texto }] })
     } else if (e.tipo === "modelo") {
-      // Si hay mensaje crudo se reenvía tal cual; si no, se reconstruye.
+      // Con mensaje crudo se reenvía tal cual; si no, se reconstruye.
       const crudo = e.crudo as Contenido | undefined
       contenidos.push(
         crudo ?? {
@@ -33,7 +33,7 @@ function aContenidos(historial: Entrada[]): Contenido[] {
         },
       )
     } else {
-      // Todos los resultados seguidos van en UN solo mensaje de usuario.
+      // Los resultados seguidos van en un solo mensaje de usuario.
       const parte = { functionResponse: { name: e.nombre, response: { resultado: e.contenido } } }
       const ultimo = contenidos[contenidos.length - 1]
       if (ultimo && ultimo.role === "user" && ultimo.parts.every((p) => "functionResponse" in p)) ultimo.parts.push(parte)
@@ -62,7 +62,7 @@ export function crearGemini(opciones: { apiKey: string; modelo: string; timeoutM
             contents: aContenidos(historial),
             tools: [{ functionDeclarations: declaraciones }],
           }),
-          signal: AbortSignal.timeout(opciones.timeoutMs ?? 20_000), // PRD: sin colgarse si el modelo tarda
+          signal: AbortSignal.timeout(opciones.timeoutMs ?? 20_000), // corta si el modelo tarda
         })
       } catch (e) {
         const tiempo = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
@@ -71,7 +71,7 @@ export function crearGemini(opciones: { apiKey: string; modelo: string; timeoutM
 
       if (!respuesta.ok) {
         const detalle = (await respuesta.text()).slice(0, 200)
-        // 429 (límite) y 5xx (caída) merecen probar el respaldo; 400/403/404 no.
+        // 429 y 5xx se reintentan con el respaldo; 400, 403 y 404 no.
         throw new ErrorModelo(`${opciones.modelo}: HTTP ${respuesta.status} ${detalle}`, respuesta.status === 429 || respuesta.status >= 500)
       }
 

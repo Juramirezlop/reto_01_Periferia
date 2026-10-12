@@ -1,5 +1,4 @@
-// Lista los modelos de Gemini que puede usar tu clave y, si le pasas uno, lo prueba
-// con una herramienta (que es lo que hará el agente).
+// Lista los modelos de Gemini disponibles para tu clave y prueba los que le indiques.
 //
 //   bun run modelos                         -> lista los modelos disponibles
 //   bun run modelos gemini-a gemini-b ...   -> prueba cada modelo 3 veces: velocidad y llamada a herramienta
@@ -14,8 +13,7 @@ if (!claveEntorno) {
 }
 const clave: string = claveEntorno
 
-// Una llamada HTTP a la API. La clave va en un encabezado (no en la URL) para que
-// nunca aparezca en un mensaje de error. Si algo falla, devuelve el motivo en texto.
+// Llamada HTTP a la API; la clave va en un encabezado, no en la URL.
 async function llamar(ruta: string, cuerpo?: unknown): Promise<{ estado: number; json: unknown; ms: number }> {
   const inicio = performance.now()
   try {
@@ -23,7 +21,7 @@ async function llamar(ruta: string, cuerpo?: unknown): Promise<{ estado: number;
       method: cuerpo === undefined ? "GET" : "POST",
       headers: { "x-goog-api-key": clave, "content-type": "application/json" },
       body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
-      signal: AbortSignal.timeout(30_000), // si Google no responde en 30 s, se corta
+      signal: AbortSignal.timeout(30_000), // corta a los 30 s
     })
     const json: unknown = await respuesta.json().catch(() => null)
     return { estado: respuesta.status, json, ms: Math.round(performance.now() - inicio) }
@@ -33,7 +31,7 @@ async function llamar(ruta: string, cuerpo?: unknown): Promise<{ estado: number;
   }
 }
 
-// Saca el mensaje de error de la respuesta de Google (si lo hay).
+// Extrae el mensaje de error de la respuesta de Google.
 function mensajeDeError(json: unknown): string {
   const parseo = z.object({ error: z.object({ message: z.string() }) }).safeParse(json)
   return parseo.success ? parseo.data.error.message : "respuesta sin detalle"
@@ -64,7 +62,7 @@ async function listarModelos(): Promise<void> {
     }
     const datos = EsquemaListado.parse(json)
     for (const m of datos.models) {
-      // Solo modelos Gemini que sirven para conversar (generateContent).
+      // Solo modelos Gemini que sirven para conversar.
       if (m.name.includes("gemini") && m.supportedGenerationMethods?.includes("generateContent")) {
         encontrados.push(`${m.name.replace("models/", "")}  (${m.displayName ?? "sin nombre"})`)
       }
@@ -142,7 +140,7 @@ async function probarModelo(nombre: string): Promise<void> {
     if (llamada) conHerramienta++
   }
 
-  // Tiempo típico = la mediana de las respuestas que sí llegaron.
+  // Tiempo típico: mediana de las respuestas que llegaron.
   const ordenados = [...tiempos].sort((a, b) => a - b)
   const tipico = ordenados.length > 0 ? `${ordenados[Math.floor(ordenados.length / 2)]} ms` : "sin datos"
   console.log(`  Resumen: ${tiempos.length}/3 respuestas, ${conHerramienta}/3 con herramienta, tiempo típico ${tipico}`)

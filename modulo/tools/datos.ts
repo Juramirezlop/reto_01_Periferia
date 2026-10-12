@@ -6,7 +6,7 @@ import { type Ctx, ErrorHerramienta, leerJson, rutasBase } from "./util"
 
 // ---------- Esquemas: cómo DEBE verse cada archivo de los fixtures ----------
 
-// Nombre de caso: solo minúsculas, números y guiones (evita rutas como "../../etc").
+// Nombre de caso: minúsculas, números y guiones (evita rutas como ../../etc).
 export const nombreCaso = z
   .string()
   .regex(/^[a-z0-9-]+$/, "solo minúsculas, números y guiones")
@@ -51,7 +51,7 @@ export type Maestro = z.infer<typeof EsquemaMaestro>
 export type Glosario = z.infer<typeof EsquemaGlosario>
 export type SoporteIndexado = z.infer<typeof EsquemaIndiceSoportes>[number]
 
-// Un campo pedido por el cliente. Los campos hoja/celda_* solo existen en plantillas Excel.
+// Campo pedido por el cliente; hoja y celdas solo existen en Excel.
 export type Campo = {
   etiqueta: string
   obligatorio?: boolean

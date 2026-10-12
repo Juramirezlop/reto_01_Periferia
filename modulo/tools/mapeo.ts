@@ -4,12 +4,12 @@ import { normalizar, obtenerPorRuta } from "./util"
 // RN1: cómo se llama el identificador tributario en cada país.
 export const ID_TRIBUTARIO: Record<string, string> = { CO: "NIT", EC: "RUC", PE: "RUC", PA: "RUC", HN: "RTN" }
 
-// HU-1: etiquetas que no dicen qué documento piden (ya normalizadas: sin tildes ni mayúsculas).
+// Etiquetas que no dicen qué documento piden (normalizadas).
 const ETIQUETAS_AMBIGUAS = ["identificacion tributaria", "numero de identificacion fiscal"]
 
 export const esAmbigua = (etiqueta: string) => ETIQUETAS_AMBIGUAS.includes(normalizar(etiqueta))
 
-// Cada campo pedido termina en EXACTAMENTE uno de estos tres estados.
+// Los tres estados posibles de un campo.
 export type Lleno = { etiqueta: string; ruta: string; valor: unknown }
 export type PorConfirmar = { etiqueta: string; ruta: string; valor: unknown; confianza: number; nota: string }
 export type Faltante = { etiqueta: string; motivo: string }
@@ -17,9 +17,7 @@ export type Mapeo = { llenos: Lleno[]; faltantes: Faltante[]; requiere_confirmac
 
 type Coincidencia = { ruta: string; confianza: number; clave: string }
 
-// Busca la ruta del maestro para una etiqueta usando el glosario.
-//  - Igual (sin tildes ni mayúsculas)      -> confianza 1.0
-//  - Una contiene a la otra (ej. "Dirección de entrega" contiene "Dirección") -> 0.7
+// Busca la ruta del maestro para una etiqueta con el glosario (exacta: 1.0, parcial: 0.7).
 function buscarEnGlosario(etiqueta: string, glosario: Glosario): Coincidencia | undefined {
   const buscada = normalizar(etiqueta)
   let mejorParcial: Coincidencia | undefined
@@ -28,7 +26,7 @@ function buscarEnGlosario(etiqueta: string, glosario: Glosario): Coincidencia | 
     const claveNormal = normalizar(clave)
     if (claveNormal === buscada) return { ruta, confianza: 1, clave }
     const parcial = claveNormal.length >= 5 && (buscada.includes(claveNormal) || claveNormal.includes(buscada))
-    // Si hay varias parciales gana la más larga (la más específica).
+    // Entre varias parciales gana la más larga.
     if (parcial && (!mejorParcial || clave.length > mejorParcial.clave.length)) {
       mejorParcial = { ruta, confianza: 0.7, clave }
     }
@@ -36,7 +34,7 @@ function buscarEnGlosario(etiqueta: string, glosario: Glosario): Coincidencia | 
   return mejorParcial
 }
 
-// El corazón de HU-2. Es código determinista: el modelo NO decide ningún valor.
+// Cruza cada etiqueta con el maestro. Es código determinista, no usa el modelo.
 export function mapearCampos(etiquetas: string[], pais: string, glosario: Glosario, maestro: Maestro): Mapeo {
   const mapeo: Mapeo = { llenos: [], faltantes: [], requiere_confirmacion: [] }
 
@@ -54,7 +52,7 @@ export function mapearCampos(etiquetas: string[], pais: string, glosario: Glosar
       continue
     }
 
-    // Reunimos los motivos por los que un humano debería confirmar.
+    // Motivos para pedir confirmación.
     const notas: string[] = []
     if (confianza < 0.8) notas.push(`Coincidencia parcial con "${clave}" (confianza ${confianza}).`)
     if (esAmbigua(etiqueta)) {
@@ -73,7 +71,7 @@ export function mapearCampos(etiquetas: string[], pais: string, glosario: Glosar
   return mapeo
 }
 
-// Para escribir el formulario: etiqueta -> valor (solo lo que salió del maestro).
+// Valor por etiqueta, para escribir el formulario.
 export function valoresPorEtiqueta(mapeo: Mapeo): Map<string, unknown> {
   const valores = new Map<string, unknown>()
   for (const l of mapeo.llenos) valores.set(l.etiqueta, l.valor)
@@ -81,8 +79,7 @@ export function valoresPorEtiqueta(mapeo: Mapeo): Map<string, unknown> {
   return valores
 }
 
-// Datos bancarios: el modelo no necesita verlos, así que no se le envían completos (RN2).
-// Solo el archivo generado lleva el valor real.
+// Rutas bancarias: el modelo no las ve completas (RN2).
 const RUTAS_SENSIBLES = /^banco\./
 
 function enmascarar(valor: unknown): string {
@@ -90,7 +87,7 @@ function enmascarar(valor: unknown): string {
   return texto.length > 4 ? `***${texto.slice(-4)}` : "***"
 }
 
-// Devuelve una copia del mapeo apta para enviar al modelo.
+// Copia del mapeo con los datos bancarios enmascarados, apta para el modelo.
 export function ocultarSensibles(mapeo: Mapeo): Mapeo {
   const ocultar = <T extends { ruta: string; valor: unknown }>(item: T): T =>
     RUTAS_SENSIBLES.test(item.ruta) ? { ...item, valor: enmascarar(item.valor) } : item
