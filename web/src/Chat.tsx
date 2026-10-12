@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import Markdown from "react-markdown"
-import type { VistaCaso } from "./api"
+import type { Llamado, VistaCaso } from "./api"
 import { Frontera } from "./Frontera"
 
-export type Mensaje = { rol: "usuario" | "agente"; texto: string; herramientas?: { nombre: string; ok: boolean }[]; error?: boolean }
+export type Mensaje = { rol: "usuario" | "agente"; texto: string; herramientas?: Llamado[]; pideConfirmacion?: boolean; error?: boolean }
 
 // Adorno que se ve con el chat vacío
 function Ondas() {
@@ -58,7 +58,8 @@ export function Chat(props: {
           </div>
         )}
         {props.mensajes.map((m, i) => (
-          <article key={i} className={`mensaje ${m.rol}${m.error ? " error" : ""}`}>
+          <article key={i} className={`mensaje ${m.rol}${m.error ? " error" : ""}${m.pideConfirmacion ? " pide-confirmacion" : ""}`}>
+            {m.pideConfirmacion && <p className="aviso-confirmar">Necesita tu confirmación</p>}
             {m.rol === "agente" ? (
               // Si el Markdown falla se muestra el texto plano
               <Frontera alternativa={() => <p style={{ whiteSpace: "pre-wrap" }}>{m.texto}</p>}>
@@ -71,7 +72,9 @@ export function Chat(props: {
               <ol className="traza">
                 {m.herramientas.map((h, j) => (
                   <li key={j} className={h.ok ? "ok" : "falla"} style={{ animationDelay: `${j * 90}ms` }}>
-                    {h.nombre.replace("proveedor_", "")}
+                    <strong>{h.nombre.replace("proveedor_", "")}</strong>
+                    <code>{h.args}</code>
+                    <span>→ {h.resumen}</span>
                   </li>
                 ))}
               </ol>

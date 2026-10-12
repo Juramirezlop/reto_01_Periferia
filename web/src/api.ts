@@ -11,8 +11,9 @@ export type VistaCaso = {
   archivos: string[]
 }
 
-export type Respuesta = { respuesta: string; herramientas: { nombre: string; ok: boolean }[]; tokens?: number }
-export type Salud = { modelo: string; clave: boolean; fecha: string }
+export type Llamado = { nombre: string; args: string; ok: boolean; resumen: string }
+export type Respuesta = { respuesta: string; herramientas: Llamado[]; pideConfirmacion: boolean; tokens?: number }
+export type Salud = { provider: string; model: string; clave: boolean; fecha: string }
 
 async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, init)
@@ -21,7 +22,7 @@ async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
   return datos as T
 }
 
-export const obtenerSalud = () => pedir<Salud>("/api/salud")
+export const obtenerSalud = () => pedir<Salud>("/api/health")
 export const obtenerCasos = () => pedir<string[]>("/api/casos")
 export const obtenerCaso = (caso: string) => pedir<VistaCaso>(`/api/caso/${caso}`)
 export const urlArchivo = (caso: string, archivo: string) => `/api/archivo/${caso}/${archivo}`

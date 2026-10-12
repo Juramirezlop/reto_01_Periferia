@@ -42,7 +42,7 @@ export function App() {
     setTrabajando(true)
     try {
       const r = await enviarMensaje(sessionId, texto)
-      setMensajes((m) => [...m, { rol: "agente", texto: r.respuesta, herramientas: r.herramientas }])
+      setMensajes((m) => [...m, { rol: "agente", texto: r.respuesta, herramientas: r.herramientas, pideConfirmacion: r.pideConfirmacion }])
     } catch (e) {
       setMensajes((m) => [...m, { rol: "agente", texto: `No pude hablar con el servidor: ${e instanceof Error ? e.message : e}`, herramientas: [], error: true }])
     }
@@ -63,7 +63,7 @@ export function App() {
         <h1>Registro de proveedores</h1>
         <p className="estado-sistema">
           <span className={`punto ${salud?.clave ? "ok" : "falla"}`} />
-          {salud ? (salud.clave ? salud.modelo : "falta GEMINI_API_KEY en .env") : "servidor sin conexión"}
+          {salud ? (salud.clave ? salud.model : "falta GEMINI_API_KEY en .env") : "servidor sin conexión"}
           {salud && <span className="fecha">fecha de ejecución {salud.fecha}</span>}
         </p>
       </header>

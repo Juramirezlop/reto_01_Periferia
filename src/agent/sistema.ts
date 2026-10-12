@@ -24,3 +24,6 @@ export function confirmaEnvio(texto: string, ultimoDelAgente = ""): boolean {
   if (/\b(confirmo|confirmado|confirmada|env[ií]alo|env[ií]ala|adelante|s[ií],? env[ií]a)\b/.test(t)) return true
   return /^\s*(s[ií]|ok|dale|de acuerdo)(?![a-záéíóúñ])/.test(t) && /confirm/i.test(ultimoDelAgente)
 }
+
+// Resalta respuesta en el chat
+export const pideConfirmacion = (texto: string): boolean => /confirm/i.test(texto) && /\?[\s*_"')]*$/.test(texto)

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs"
 import { readdir, stat } from "node:fs/promises"
 import { join, resolve, sep } from "node:path"
 import { z } from "zod"
-import { manejarMensaje, reiniciarSesion } from "./app"
+import { historialSesion, manejarMensaje, reiniciarSesion } from "./app"
 import { config } from "./config"
 import { prepararCasos } from "./preparar"
 import { ejecutar } from "./agent/herramientas"
@@ -18,8 +18,15 @@ Bun.serve({
   async fetch(req) {
     const { pathname } = new URL(req.url)
 
-    if (pathname === "/api/salud") {
-      return json({ ok: true, modelo: config.modelo, clave: Boolean(config.apiKey), fecha: fechaEjecucion() })
+    if (pathname === "/api/health") {
+      return json({ ok: true, provider: "gemini", model: config.modelo, clave: Boolean(config.apiKey), fecha: fechaEjecucion() })
+    }
+
+    // Historial completo de una sesión
+    const rutaSesion = pathname.match(/^\/api\/sessions\/([^/]+)$/)
+    if (rutaSesion) {
+      const historial = historialSesion(decodeURIComponent(rutaSesion[1]!))
+      return historial ? json(historial) : json({ error: "Sesión no encontrada." }, 404)
     }
 
     // Vista del caso para el panel

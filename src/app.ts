@@ -1,4 +1,4 @@
-import { responder, type Resultado, type Sesion } from "./agent/loop"
+import { responder, resumir, type Resultado, type Sesion } from "./agent/loop"
 import { construirSistema } from "./agent/sistema"
 import { config } from "./config"
 import type { Adaptador } from "./llm/adapter"
@@ -21,7 +21,7 @@ export async function manejarMensaje(
   adaptadoresPrueba?: Adaptador[], // permite inyectar un modelo simulado en las pruebas
 ): Promise<Resultado> {
   if (!adaptadoresPrueba && !config.apiKey) {
-    return { respuesta: "Falta GEMINI_API_KEY en el archivo .env.", herramientas: [] }
+    return { respuesta: "Falta GEMINI_API_KEY en el archivo .env.", herramientas: [], pideConfirmacion: false }
   }
   const adaptadores = adaptadoresPrueba ?? adaptadoresPorDefecto()
   const ctx: Ctx = { directory, sessionId }
@@ -32,3 +32,17 @@ export async function manejarMensaje(
 }
 
 export const reiniciarSesion = (sessionId: string) => sesiones.delete(sessionId)
+
+// Historial de una sesión sin datos internos del proveedor
+export function historialSesion(sessionId: string) {
+  const sesion = sesiones.get(sessionId)
+  if (!sesion) return null
+  const mensajes = sesion.historial.map((e) =>
+    e.tipo === "usuario"
+      ? { rol: "usuario", texto: e.texto }
+      : e.tipo === "modelo"
+        ? { rol: "agente", texto: e.texto, herramientas: e.llamadas.map((l) => l.nombre) }
+        : { rol: "herramienta", nombre: e.nombre, resumen: resumir(e.contenido) },
+  )
+  return { sessionId, tokens: sesion.tokens, mensajes }
+}

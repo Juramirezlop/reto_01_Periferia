@@ -5,7 +5,8 @@ import { join } from "node:path"
 import { beforeAll, describe, expect, test } from "bun:test"
 import { responder, type Sesion } from "../agent/loop"
 import { ejecutar } from "../agent/herramientas"
-import { confirmaEnvio, construirSistema } from "../agent/sistema"
+import { confirmaEnvio, construirSistema, pideConfirmacion } from "../agent/sistema"
+import { historialSesion, manejarMensaje } from "../app"
 import { prepararCasos } from "../preparar"
 import { ErrorModelo, type Adaptador, type Entrada, type Llamada } from "../llm/adapter"
 import { crearGemini } from "../llm/gemini"
@@ -31,8 +32,17 @@ describe("ciclo del agente", () => {
       { texto: "Listo: falta un soporte." },
     )
     const r = await correr([modelo], "Procesa ec-corp-andina")
-    expect(r.herramientas).toEqual([{ nombre: "proveedor_armar_paquete", ok: true }])
+    expect(r.herramientas.map((h) => [h.nombre, h.ok])).toEqual([["proveedor_armar_paquete", true]])
     expect(r.respuesta).toBe("Listo: falta un soporte.")
+    expect(r.herramientas[0]?.args).toContain("ec-corp-andina") // el chat muestra los argumentos
+    expect(r.herramientas[0]?.resumen.length).toBeGreaterThan(0) // y un resultado resumido
+    expect(r.pideConfirmacion).toBe(false)
+  })
+
+  test("marca la respuesta que cierra pidiendo confirmación", async () => {
+    const r = await correr([guion({ texto: "El paquete está listo. ¿Confirmas el envío?" })], "hola")
+    expect(r.pideConfirmacion).toBe(true)
+    expect(pideConfirmacion("Confirmo que falta un soporte.")).toBe(false) // sin pregunta no cuenta
   })
 
   test("el modelo NO puede confirmar un envío (aunque mande confirmado:true)", async () => {
@@ -197,6 +207,17 @@ describe("ahorro de llamadas", () => {
     const despues = (await Bun.file(registro).text()).split("\n").filter((l) => l.includes("leer_solicitud")).length
     expect(despues - antes).toBe(1)
     expect(r.herramientas.length).toBe(2) // se informan las dos llamadas, pero solo una se ejecutó
+  })
+})
+
+describe("historial de sesión", () => {
+  test("devuelve lo conversado sin datos internos del proveedor, y null si no existe", async () => {
+    const modelo = guion({ llamadas: [llamar("proveedor_armar_paquete", { caso: "ec-corp-andina" })] }, { texto: "listo" })
+    await manejarMensaje("sesion-historial", "Procesa ec-corp-andina", ctx.directory, [modelo])
+    const h = historialSesion("sesion-historial")
+    expect(h?.mensajes.map((m) => m.rol)).toEqual(["usuario", "agente", "herramienta", "agente"])
+    expect(JSON.stringify(h)).not.toContain("crudo")
+    expect(historialSesion("no-existe")).toBeNull()
   })
 })
 

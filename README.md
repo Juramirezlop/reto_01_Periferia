@@ -1,6 +1,6 @@
 # Agente - Registro como Proveedor
 
-Este repositorio contiene mi solución al reto técnico 01. 
+Este repositorio contiene mi solución al reto técnico 01.
 
 Un agente conversacional lee la solicitud de un cliente, llena el formulario con los datos de la empresa, arma el paquete de soportes para firma y nunca envía nada sin que una persona lo confirme., el diseño, las decisiones y la cobertura del PRD están en el archivo`SOLUCION.md`.
 
@@ -50,6 +50,20 @@ No envíes nada todavía.
 Con la fecha por defecto deberías ver los casos de Colombia y Panamá listos, el de Ecuador bloqueado (falta el certificado de cumplimiento tributario) y el de Honduras bloqueado (parafiscales vencidos). Los archivos quedan en `out/<caso>/` y se descargan desde el panel de la derecha.
 
 Si respondes "confirmo el envío" con un caso listo, el agente escribe `ENVIO-SIMULADO.md`, este no enviara nada real.
+
+## API
+
+El backend expone estas rutas:
+
+| Método | Ruta                     | Qué hace                                                                                                                                                                                                                                                     |
+| ------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST    | `/api/chat`            | Recibe`{ sessionId, mensaje }` y responde `{ respuesta, herramientas, pideConfirmacion, tokens }`. Cada herramienta trae `nombre`, `args`, `ok` y `resumen`. `pideConfirmacion` es verdadero cuando la respuesta cierra pidiendo confirmación. |
+| GET     | `/api/sessions/:id`    | Historial completo de la sesión (mensajes, herramientas usadas y tokens). Responde 404 si no existe.                                                                                                                                                         |
+| POST    | `/api/reiniciar`       | Borra la sesión que se envía en`{ sessionId }`.                                                                                                                                                                                                           |
+| GET     | `/api/health`          | `{ ok, provider, model, clave, fecha }`. `clave` solo dice si hay una clave configurada, nunca la muestra.                                                                                                                                                |
+| GET     | `/api/casos`           | Lista los casos disponibles.                                                                                                                                                                                                                                  |
+| GET     | `/api/caso/:caso`      | Expediente del caso (solicitud, mapeo, estado y archivos), calculado sin el modelo.                                                                                                                                                                           |
+| GET     | `/api/archivo/:caso/*` | Descarga un archivo generado en`out/<caso>/`.                                                                                                                                                                                                               |
 
 ## Link de prueba
 
