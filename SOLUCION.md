@@ -96,6 +96,7 @@ flowchart LR
 5. Sin base de datos, tal como pide el PRD, actualmente las sesiones viven en memoria y los resultados en `out/`. Se pierden al reiniciar el servidor.
 6. El módulo exportable (`modulo/`) es la fuente de verdad y la app lo usa: el prompt, el conocimiento y las herramientas viven ahí y el servidor los importa, por entendimiento del reto y por querer intentar el bono, descarté mantener una copia aparte para el módulo porque las dos se desfasarían.
 7. Un front en React con el expediente calculado sin el modelo, en lugar de un HTML simple, de esta manera podemos ver el estado real del caso aunque el modelo falle y la analista descarga los archivos sin tener acceso al disco del servidor.
+8. Finalmente se escogio como plataforma de despliegue Railway, al cargar el proyecto, este quedo en linea bajo el siguiente link: `https://productionagentperiferia.up.railway.app/`
 
 ## 7. Supuestos
 

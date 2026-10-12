@@ -67,7 +67,9 @@ El backend expone estas rutas:
 
 ## Link de prueba
 
-Pendiente de despliegue.
+El proyecto esta en linea, se encuentra en el siguiente link: [productionagentperiferia.up.railway.app](https://productionagentperiferia.up.railway.app/)
+
+El enlace es público y no tiene clave de acceso, para comprobar que el servidor responde: [productionagentperiferia.up.railway.app/api/health](https://productionagentperiferia.up.railway.app/api/health)
 
 ## Qué hay en cada carpeta
 
