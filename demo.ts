@@ -5,8 +5,7 @@ import { join } from "node:path"
 import * as proveedor from "./modulo/tools/proveedor"
 import type { Ctx } from "./modulo/tools/util"
 
-// Fecha fija para que el resultado sea reproducible (PRD); `||=` cubre también FECHA_EJECUCION vacía.
-// Otra fecha en PowerShell: $env:FECHA_EJECUCION="2026-10-10"; bun run demo.ts
+// Fecha fija para que el resultado sea reproducible (PRD); `||=` cubre también FECHA_EJECUCION vacía
 process.env.FECHA_EJECUCION ||= "2026-09-03"
 
 type Respuesta = { ok: boolean; data?: Record<string, unknown>; error?: string }
@@ -14,13 +13,13 @@ type Herramienta = { execute: (args: unknown, ctx: Ctx) => Promise<string> }
 
 const ctx: Ctx = { directory: process.cwd(), sessionId: "demo" }
 
-// Llama una herramienta por nombre y devuelve su respuesta como objeto.
+// Llama una herramienta por nombre y devuelve su respuesta como objeto
 async function llamar(nombre: keyof typeof proveedor, args: unknown): Promise<Respuesta> {
   const herramienta: Herramienta = proveedor[nombre]
   return JSON.parse(await herramienta.execute(args, ctx)) as Respuesta
 }
 
-// Limpia out/ para partir de cero.
+// Limpia out/
 await rm(join(ctx.directory, "out"), { recursive: true, force: true })
 console.log(`Fecha de ejecución: ${process.env.FECHA_EJECUCION}`)
 
@@ -60,14 +59,14 @@ for (const caso of casos) {
   console.log(`  Envío sin confirmar: ${sinConfirmar.ok ? "ERROR: no debió permitirse" : `bloqueado ("${sinConfirmar.error}")`}`)
 }
 
-// Envío confirmado del primer caso, para mostrar el archivo simulado.
+// Envío confirmado del primer caso
 const primero = casos[0]
 if (primero) {
   const envio = await llamar("simular_envio", { caso: primero, confirmado: true })
   console.log(`\nEnvío confirmado de ${primero}: ${envio.ok ? String(envio.data?.ruta) : envio.error}`)
 }
 
-// Errores controlados (HU-5): las herramientas devuelven { ok: false, error }.
+// Errores controlados, las herramientas devuelven { ok: false, error }.
 console.log("\n=== Errores controlados ===")
 console.log("  Caso inexistente:", (await llamar("leer_solicitud", { caso: "no-existe" })).error)
 console.log("  Argumento inválido:", (await llamar("leer_solicitud", { caso: "../../etc" })).error)

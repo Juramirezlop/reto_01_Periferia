@@ -1,4 +1,4 @@
-// Chat por terminal con el agente. Uso: bun run chat   (escribe "salir" para terminar)
+// Chat por terminal con el agente
 import { manejarMensaje } from "../app"
 
 console.log('Agente de registro de proveedores. Escribe "salir" para terminar.\n')

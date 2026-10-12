@@ -5,12 +5,12 @@ import type { Ctx } from "../../modulo/tools/util"
 
 type Herramienta = { description: string; args: z.ZodRawShape; execute: (args: unknown, ctx: Ctx) => Promise<string> }
 
-// Cada export de proveedor.ts es una herramienta: proveedor_<export>.
+// Cada export de proveedor.ts es una herramienta
 const registro = new Map<string, Herramienta>(
   Object.entries(proveedor).map(([nombre, h]) => [`proveedor_${nombre}`, h as Herramienta]),
 )
 
-// Lo que ve el modelo: nombre, descripción y esquema de argumentos (desde zod).
+// Lo que ve el modelo: nombre, descripción y esquema de argumentos
 export function declaraciones(): DeclaracionHerramienta[] {
   return [...registro.entries()].map(([nombre, h]) => ({
     nombre,
@@ -19,8 +19,7 @@ export function declaraciones(): DeclaracionHerramienta[] {
   }))
 }
 
-// Ejecuta una herramienta pedida por el modelo; nunca lanza.
-// `usuarioConfirmo` fija `confirmado`: el modelo no puede confirmar por su cuenta.
+// Ejecuta una herramienta pedida por el modelo
 export async function ejecutar(nombre: string, args: unknown, ctx: Ctx, usuarioConfirmo: boolean): Promise<string> {
   const herramienta = registro.get(nombre)
   if (!herramienta) return JSON.stringify({ ok: false, error: `La herramienta "${nombre}" no existe.` })

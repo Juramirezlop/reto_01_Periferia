@@ -5,7 +5,7 @@ import type { Adaptador } from "./llm/adapter"
 import { crearGemini } from "./llm/gemini"
 import type { Ctx } from "../modulo/tools/util"
 
-// Una conversación por sessionId, en memoria.
+// Una conversación por sessionId
 const sesiones = new Map<string, Sesion>()
 
 function adaptadoresPorDefecto(): Adaptador[] {

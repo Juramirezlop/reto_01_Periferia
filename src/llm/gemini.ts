@@ -5,7 +5,7 @@ const URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 type Parte = Record<string, unknown>
 type Contenido = { role: "user" | "model"; parts: Parte[] }
 
-// Convierte el esquema JSON de zod al formato de Gemini (tipos en mayúsculas).
+// Convierte el esquema JSON de zod al formato de Gemini
 function aEsquemaGemini(esquema: unknown): unknown {
   if (Array.isArray(esquema)) return esquema.map(aEsquemaGemini)
   if (typeof esquema !== "object" || esquema === null) return esquema
@@ -17,14 +17,13 @@ function aEsquemaGemini(esquema: unknown): unknown {
   return salida
 }
 
-// Traduce el historial neutral al formato de Gemini.
+// Traduce el historial neutral al formato de Gemini
 function aContenidos(historial: Entrada[]): Contenido[] {
   const contenidos: Contenido[] = []
   for (const e of historial) {
     if (e.tipo === "usuario") {
       contenidos.push({ role: "user", parts: [{ text: e.texto }] })
     } else if (e.tipo === "modelo") {
-      // Con mensaje crudo se reenvía tal cual; si no, se reconstruye.
       const crudo = e.crudo as Contenido | undefined
       contenidos.push(
         crudo ?? {
@@ -33,7 +32,7 @@ function aContenidos(historial: Entrada[]): Contenido[] {
         },
       )
     } else {
-      // Los resultados seguidos van en un solo mensaje de usuario.
+      // Los resultados seguidos van en un solo mensaje de usuario
       const parte = { functionResponse: { name: e.nombre, response: { resultado: e.contenido } } }
       const ultimo = contenidos[contenidos.length - 1]
       if (ultimo && ultimo.role === "user" && ultimo.parts.every((p) => "functionResponse" in p)) ultimo.parts.push(parte)
@@ -71,7 +70,6 @@ export function crearGemini(opciones: { apiKey: string; modelo: string; timeoutM
 
       if (!respuesta.ok) {
         const detalle = (await respuesta.text()).slice(0, 200)
-        // 429 y 5xx se reintentan con el respaldo; 400, 403 y 404 no.
         throw new ErrorModelo(`${opciones.modelo}: HTTP ${respuesta.status} ${detalle}`, respuesta.status === 429 || respuesta.status >= 500)
       }
 

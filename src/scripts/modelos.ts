@@ -1,7 +1,5 @@
 // Lista los modelos de Gemini disponibles para tu clave y prueba los que le indiques.
-//
-//   bun run modelos                         -> lista los modelos disponibles
-//   bun run modelos gemini-a gemini-b ...   -> prueba cada modelo 3 veces: velocidad y llamada a herramienta
+
 import { z } from "zod"
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta"
@@ -13,7 +11,7 @@ if (!claveEntorno) {
 }
 const clave: string = claveEntorno
 
-// Llamada HTTP a la API; la clave va en un encabezado, no en la URL.
+// Llamada HTTP a la API
 async function llamar(ruta: string, cuerpo?: unknown): Promise<{ estado: number; json: unknown; ms: number }> {
   const inicio = performance.now()
   try {
@@ -37,7 +35,7 @@ function mensajeDeError(json: unknown): string {
   return parseo.success ? parseo.data.error.message : "respuesta sin detalle"
 }
 
-// ---------- Modo 1: listar modelos ----------
+// ---------- listar modelos ----------
 
 const EsquemaListado = z.object({
   models: z.array(
@@ -62,7 +60,7 @@ async function listarModelos(): Promise<void> {
     }
     const datos = EsquemaListado.parse(json)
     for (const m of datos.models) {
-      // Solo modelos Gemini que sirven para conversar.
+      // Solo modelos Gemini que sirven para conversar
       if (m.name.includes("gemini") && m.supportedGenerationMethods?.includes("generateContent")) {
         encontrados.push(`${m.name.replace("models/", "")}  (${m.displayName ?? "sin nombre"})`)
       }
@@ -76,7 +74,7 @@ async function listarModelos(): Promise<void> {
   console.log("\nPrueba varios con:  bun run modelos <modelo-1> <modelo-2> ...")
 }
 
-// ---------- Modo 2: probar modelos con una herramienta ----------
+// ---------- probar modelos con una herramienta ----------
 
 const EsquemaRespuesta = z.object({
   candidates: z
@@ -140,7 +138,7 @@ async function probarModelo(nombre: string): Promise<void> {
     if (llamada) conHerramienta++
   }
 
-  // Tiempo típico: mediana de las respuestas que llegaron.
+  // Mediana de las respuestas que llegaron
   const ordenados = [...tiempos].sort((a, b) => a - b)
   const tipico = ordenados.length > 0 ? `${ordenados[Math.floor(ordenados.length / 2)]} ms` : "sin datos"
   console.log(`  Resumen: ${tiempos.length}/3 respuestas, ${conHerramienta}/3 con herramienta, tiempo típico ${tipico}`)

@@ -1,8 +1,10 @@
-# Agente "Registro como Proveedor"
+# Agente - Registro como Proveedor
 
-Es mi solución al reto técnico 01. Un agente conversacional lee la solicitud de un cliente, llena el formulario con los datos de la empresa, arma el paquete de soportes para firma y nunca envía nada sin que una persona lo confirme. El diseño, las decisiones y la cobertura del PRD están en `SOLUCION.md`.
+Este repositorio contiene mi solución al reto técnico 01. 
 
-## Cómo levantarlo
+Un agente conversacional lee la solicitud de un cliente, llena el formulario con los datos de la empresa, arma el paquete de soportes para firma y nunca envía nada sin que una persona lo confirme., el diseño, las decisiones y la cobertura del PRD están en el archivo`SOLUCION.md`.
+
+## Cómo "levantarlo"
 
 Necesitas Bun 1.4 o superior (https://bun.sh).
 
@@ -12,18 +14,18 @@ cp .env.example .env
 bun run dev
 ```
 
-En PowerShell el segundo comando es `copy .env.example .env`. Después abre `.env` y pega tu clave de Gemini en `GEMINI_API_KEY` (se saca gratis en https://aistudio.google.com/apikey). El backend queda en el puerto 3000 y el front en http://localhost:5173.
+En PowerShell el segundo comando es `copy .env.example .env`. Después abre `.env` y pega tu clave segun el modelo que se vaya a utilizar (en este caso utilizamos Gemini, la clave se puede obtener en Google AI Studio) en `GEMINI_API_KEY`, el backend queda en el puerto 3000 y el front en http://localhost:5173.
 
 ## Variables de entorno
 
 Todas están en `.env.example`, con sus valores por defecto:
 
-- `GEMINI_API_KEY`: la clave del modelo. Solo la lee el backend. Es la única obligatoria.
+- `GEMINI_API_KEY`: la clave del modelo, solo la lee el backend. Es la única obligatoria.
 - `LLM_MODEL` y `LLM_MODEL_RESPALDO`: el modelo principal (gemini-3.6-flash) y el de respaldo (gemini-3.1-flash-lite).
-- `MAX_PASOS`: cuántas idas y vueltas con el modelo se permiten por mensaje (8).
-- `MAX_TOKENS_SESION`: tope de tokens por conversación (150000).
-- `FECHA_EJECUCION`: la fecha contra la que se revisan las vigencias de los soportes, en formato AAAA-MM-DD. Vacía usa 2026-09-03, la fecha del PRD, para que el resultado sea siempre el mismo.
-- `PORT`: el puerto del servidor (3000).
+- `MAX_PASOS`: cuántas idas y vueltas con el modelo se permiten por mensaje.
+- `MAX_TOKENS_SESION`: tope de tokens por conversación.
+- `FECHA_EJECUCION`: la fecha contra la que se revisan las vigencias de los soportes, en formato AAAA-MM-DD., si se deja vacía usa 2026-09-03, la fecha del PRD, para que el resultado sea siempre el mismo.
+- `PORT`: el puerto del servidor.
 
 ## Comandos
 
@@ -35,19 +37,19 @@ Todas están en `.env.example`, con sus valores por defecto:
 - `bun run typecheck`: revisa los tipos del backend y del front.
 - `bun run modelos`: lista y prueba los modelos disponibles para tu clave.
 
-## Probarlo
+## ¿Qué hacer si quiero probarlo?
 
-Con el servidor en marcha, escribe en el chat (al arrancar, el servidor deja armados los paquetes de los 4 casos; no hace falta correr el demo antes):
+Con el servidor en marcha, escribe en el chat:
 
 ```
-Procesa el caso "ec-corp-andina". Dime qué campos quedaron llenos, cuáles
+Procesa el caso "ec-corp-andina", dime qué campos quedaron llenos, cuáles
 faltan, si el paquete está listo para firma y qué soportes debo actualizar.
 No envíes nada todavía.
 ```
 
 Con la fecha por defecto deberías ver los casos de Colombia y Panamá listos, el de Ecuador bloqueado (falta el certificado de cumplimiento tributario) y el de Honduras bloqueado (parafiscales vencidos). Los archivos quedan en `out/<caso>/` y se descargan desde el panel de la derecha.
 
-Si respondes "confirmo el envío" con un caso listo, el agente escribe `ENVIO-SIMULADO.md`. No envía nada real.
+Si respondes "confirmo el envío" con un caso listo, el agente escribe `ENVIO-SIMULADO.md`, este no enviara nada real.
 
 ## Link de prueba
 
@@ -66,8 +68,8 @@ flowchart LR
     S --> G[agent<br/>ciclo del agente]
 ```
 
-El servidor está en `src/server.ts` y las pruebas en `src/pruebas/`.
+El servidor está en `src/server.ts` y las pruebas o test en `src/pruebas/`.
 
 ## El módulo exportable
 
-La carpeta `modulo/` trae el agente empaquetado para usarlo en otras plataformas sin mi servidor: `agent.md` (el prompt), `tools/proveedor.ts` (las 5 herramientas) y `skill/registro-proveedor/SKILL.md` (el conocimiento del proceso). Son los mismos archivos que usa esta aplicación, no copias. Para cambiar el prompt o el conocimiento se edita ahí.
+La carpeta `modulo/` trae el agente empaquetado para usarlo en otras plataformas sin el servidor creado para esta entrega, en el se encuentran: `agent.md` (el prompt), `tools/proveedor.ts` (las 5 herramientas) y `skill/registro-proveedor/SKILL.md` (el conocimiento del proceso).

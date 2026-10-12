@@ -5,7 +5,7 @@ import { Frontera } from "./Frontera"
 
 export type Mensaje = { rol: "usuario" | "agente"; texto: string; herramientas?: { nombre: string; ok: boolean }[]; error?: boolean }
 
-// Adorno que se ve con el chat vacío.
+// Adorno que se ve con el chat vacío
 function Ondas() {
   return (
     <svg className="ondas" viewBox="0 0 200 120" aria-hidden="true">
@@ -27,11 +27,10 @@ export function Chat(props: {
   const [texto, setTexto] = useState("")
   const fin = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    // Con llaves: un efecto no debe devolver valores (React falla si no es una función).
     fin.current?.scrollIntoView({ behavior: "smooth" })
   }, [props.mensajes, props.trabajando])
 
-  // Atajos del caso elegido; confirmar el envío exige paquete listo.
+  // Atajos del caso elegido
   const listo = props.vista?.estado?.listo_para_firma === true
   const atajos = props.caso
     ? [
@@ -61,7 +60,7 @@ export function Chat(props: {
         {props.mensajes.map((m, i) => (
           <article key={i} className={`mensaje ${m.rol}${m.error ? " error" : ""}`}>
             {m.rol === "agente" ? (
-              // Si el Markdown falla, se muestra el texto plano.
+              // Si el Markdown falla se muestra el texto plano
               <Frontera alternativa={() => <p style={{ whiteSpace: "pre-wrap" }}>{m.texto}</p>}>
                 <Markdown>{m.texto}</Markdown>
               </Frontera>

@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from "react"
 
-// Muestra el error si algo falla al dibujarse, en vez de dejar la pantalla en blanco.
+// Muestra el error si algo falla al dibujarse, en vez de dejar la pantalla en blanco
 export class Frontera extends Component<{ children: ReactNode; alternativa?: (error: Error) => ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null }
   static getDerivedStateFromError(error: Error) {

@@ -4,9 +4,9 @@ import { join } from "node:path"
 import { z } from "zod"
 import { type Ctx, ErrorHerramienta, leerJson, rutasBase } from "./util"
 
-// ---------- Esquemas: cómo DEBE verse cada archivo de los fixtures ----------
+// ---------- Esquemas ----------
 
-// Nombre de caso: minúsculas, números y guiones (evita rutas como ../../etc).
+// Nombre de caso: minúsculas, números y guiones
 export const nombreCaso = z
   .string()
   .regex(/^[a-z0-9-]+$/, "solo minúsculas, números y guiones")
@@ -27,13 +27,9 @@ const EsquemaPlantillaCeldas = z.array(
 )
 
 const EsquemaPlantillaCampos = z.array(z.object({ etiqueta: z.string(), obligatorio: z.boolean() }))
-
 const EsquemaSoportesExigidos = z.array(z.string())
-
 const EsquemaMaestro = z.record(z.string(), z.unknown())
-
 const EsquemaGlosario = z.record(z.string(), z.string())
-
 const EsquemaIndiceSoportes = z.array(
   z.object({
     tipo: z.string(),
@@ -51,7 +47,7 @@ export type Maestro = z.infer<typeof EsquemaMaestro>
 export type Glosario = z.infer<typeof EsquemaGlosario>
 export type SoporteIndexado = z.infer<typeof EsquemaIndiceSoportes>[number]
 
-// Campo pedido por el cliente; hoja y celdas solo existen en Excel.
+// Campo pedido por el cliente; hoja y celdas solo existen en Excel
 export type Campo = {
   etiqueta: string
   obligatorio?: boolean
@@ -89,7 +85,7 @@ export async function cargarSolicitud(ctx: Ctx, caso: string): Promise<Solicitud
   return leerJson(join(carpeta, "solicitud.json"), EsquemaSolicitud, `${caso}/solicitud.json`)
 }
 
-// Carga solicitud + plantilla (según el formato) + soportes exigidos.
+// Carga solicitud + plantilla + soportes exigidos
 export async function cargarCaso(ctx: Ctx, caso: string): Promise<CasoCargado> {
   const solicitud = await cargarSolicitud(ctx, caso)
   const carpeta = join(rutasBase(ctx).casos, caso)

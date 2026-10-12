@@ -15,7 +15,7 @@ beforeAll(() => {
   process.env.FECHA_EJECUCION = "2026-09-03"
 })
 
-// Modelo simulado: en cada turno entrega la siguiente respuesta del guion.
+// Modelo simulado
 function guion(...turnos: { texto?: string; llamadas?: Llamada[] }[]): Adaptador {
   let i = 0
   return { generar: async () => ({ texto: turnos[i]?.texto ?? "", llamadas: turnos[i++]?.llamadas ?? [] }) }
@@ -162,7 +162,7 @@ describe("adaptador de Gemini (fetch simulado)", () => {
 
 describe("errores controlados (HU-5)", () => {
   test("una plantilla corrupta da mensaje claro y el siguiente caso sigue funcionando", async () => {
-    // Copia de los fixtures en una carpeta temporal para no dañar los originales.
+    // Copia de los fixtures en una carpeta temporal para no dañar los originales
     const temporal = mkdtempSync(join(tmpdir(), "reto01-"))
     await cp(join(ctx.directory, "fixtures"), join(temporal, "fixtures"), { recursive: true })
     writeFileSync(join(temporal, "fixtures", "reto-01", "casos", "ec-corp-andina", "plantilla-campos.json"), "{ no es json")
@@ -190,7 +190,7 @@ describe("ahorro de llamadas", () => {
   test("si el modelo repite la misma llamada en un mensaje, la herramienta corre una sola vez", async () => {
     const igual = llamar("proveedor_leer_solicitud", { caso: "ec-corp-andina" })
     const modelo = guion({ llamadas: [igual, igual] }, { texto: "listo" })
-    await ejecutar("proveedor_armar_paquete", { caso: "ec-corp-andina" }, ctx, false) // crea out/ec-corp-andina
+    await ejecutar("proveedor_armar_paquete", { caso: "ec-corp-andina" }, ctx, false)
     const registro = join(ctx.directory, "out", "ec-corp-andina", "log.jsonl")
     const antes = (await Bun.file(registro).text()).split("\n").filter((l) => l.includes("leer_solicitud")).length
     const r = await correr([modelo], "hola")
@@ -236,6 +236,6 @@ describe("preparación al arrancar", () => {
       const estado = await Bun.file(join(ctx.directory, "out", caso, "estado.json")).json()
       expect(estado.listo_para_firma).toBe(true)
     }
-    expect(await prepararCasos()).toEqual([]) // segunda vez: nada que hacer
+    expect(await prepararCasos()).toEqual([])
   })
 })

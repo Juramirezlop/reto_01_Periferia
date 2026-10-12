@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { ejecutar } from "./agent/herramientas"
 import { fechaEjecucion, rutaOutCaso, rutasBase, type Ctx } from "../modulo/tools/util"
 
-// Arma los paquetes que falten o estén calculados con otra fecha, con las mismas herramientas y sin modelo.
+// Arma los paquetes que falten o estén calculados con otra fecha
 export async function prepararCasos(directory = process.cwd()): Promise<string[]> {
   const ctx: Ctx = { directory, sessionId: "arranque" }
   const entradas = await readdir(rutasBase(ctx).casos, { withFileTypes: true }).catch(() => [])

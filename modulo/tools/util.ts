@@ -3,16 +3,16 @@ import { appendFile, mkdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { z } from "zod"
 
-// Contexto de cada herramienta: directory es la raíz del proyecto.
+// Contexto de cada herramienta: directory es la raíz del proyecto
 export type Ctx = { directory: string; sessionId: string }
 
-// Error esperado, con mensaje claro para la analista.
+// Error esperado, con mensaje claro para la analista
 export class ErrorHerramienta extends Error {}
 
-// Mensaje del PRD cuando se intenta enviar sin confirmar.
+// Mensaje del PRD cuando se intenta enviar sin confirmar
 export const MENSAJE_SIN_CONFIRMACION = "requiere confirmación explícita"
 
-// Resultado de una herramienta que salió bien.
+// Resultado de una herramienta que salió bien
 export type Resultado = { data: unknown; resumen: string }
 
 // ---------- Rutas ----------
@@ -32,7 +32,7 @@ export const rutaOutCaso = (ctx: Ctx, caso: string) => join(rutasBase(ctx).out, 
 
 // ---------- Fecha ----------
 
-// Fecha para validar vigencias (AAAA-MM-DD): FECHA_EJECUCION o la de hoy.
+// Fecha para validar vigencias (AAAA-MM-DD)
 export function fechaEjecucion(): string {
   const fijada = process.env.FECHA_EJECUCION
   if (fijada && /^\d{4}-\d{2}-\d{2}$/.test(fijada)) return fijada
@@ -41,7 +41,7 @@ export function fechaEjecucion(): string {
 
 // ---------- Textos y datos ----------
 
-// Normaliza una etiqueta: sin tildes, en minúsculas y sin espacios extra.
+// Normaliza una etiqueta
 export function normalizar(texto: string): string {
   return texto
     .normalize("NFD")
@@ -51,7 +51,7 @@ export function normalizar(texto: string): string {
     .replace(/\s+/g, " ")
 }
 
-// Lee un valor anidado: obtenerPorRuta(maestro, "banco.numero_cuenta").
+// Lee un valor anidado
 export function obtenerPorRuta(obj: unknown, ruta: string): unknown {
   let actual: unknown = obj
   for (const clave of ruta.split(".")) {
@@ -61,7 +61,7 @@ export function obtenerPorRuta(obj: unknown, ruta: string): unknown {
   return actual
 }
 
-// Lee un JSON y lo valida con zod; si falla, lanza un mensaje claro.
+// Lee un JSON y lo valida con zod
 export async function leerJson<S extends z.ZodType>(
   ruta: string,
   esquema: S,
@@ -90,7 +90,7 @@ export async function leerJson<S extends z.ZodType>(
   return resultado.data
 }
 
-// ---------- Registro (log.jsonl) ----------
+// ---------- Log ----------
 
 async function registrar(
   ctx: Ctx,
@@ -104,13 +104,13 @@ async function registrar(
   try {
     const { out, casos } = rutasBase(ctx)
     await mkdir(out, { recursive: true })
-    await appendFile(join(out, "log.jsonl"), linea) // log global (CA4)
+    await appendFile(join(out, "log.jsonl"), linea) // log global
     if (caso && existsSync(join(casos, caso))) {
       await mkdir(rutaOutCaso(ctx, caso), { recursive: true })
-      await appendFile(join(rutaOutCaso(ctx, caso), "log.jsonl"), linea) // log por caso (RN5)
+      await appendFile(join(rutaOutCaso(ctx, caso), "log.jsonl"), linea) // log por caso
     }
   } catch {
-    // Un fallo del log no rompe la herramienta.
+    // Un fallo del log no rompe la herramienta
   }
 }
 
@@ -122,10 +122,8 @@ function extraerCaso(args: unknown): string | undefined {
   return undefined
 }
 
-// ---------- Contrato de herramienta ----------
+// ---------- zod ----------
 
-// Crea la herramienta { description, args, execute }: valida con zod, nunca lanza,
-// devuelve JSON { ok, data } o { ok: false, error } y registra el log.
 export function definirHerramienta<S extends z.ZodRawShape>(def: {
   nombre: string
   description: string

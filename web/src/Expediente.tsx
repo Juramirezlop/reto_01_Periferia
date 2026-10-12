@@ -1,6 +1,6 @@
 import { urlArchivo, type VistaCaso } from "./api"
 
-// Texto del valor (los datos bancarios ya vienen enmascarados).
+// Texto del valor
 const texto = (v: unknown) => (typeof v === "object" ? JSON.stringify(v) : String(v))
 
 export function Expediente({ caso, vista }: { caso: string; vista: VistaCaso }) {
@@ -8,7 +8,7 @@ export function Expediente({ caso, vista }: { caso: string; vista: VistaCaso }) 
   const total = llenos.length + confirmar.length + faltantes.length || 1
   const estado = vista.estado
 
-  // Campos en el orden del cliente, con su estado.
+  // Campos en el orden del cliente
   const filas = vista.solicitud.campos.map((c) => {
     const lleno = llenos.find((l) => l.etiqueta === c.etiqueta)
     const conf = confirmar.find((l) => l.etiqueta === c.etiqueta)

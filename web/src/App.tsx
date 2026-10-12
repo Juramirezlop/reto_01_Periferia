@@ -17,7 +17,7 @@ export function App() {
   const [vista, setVista] = useState<Vista>("chat")
   const [enfocarChat, setEnfocarChat] = useState(false)
 
-  // Trae o refresca la vista de un caso; si falla, conserva la anterior.
+  // Trae o refresca la vista de un caso
   const cargarCaso = useCallback(async (caso: string) => {
     try {
       const v = await obtenerCaso(caso)

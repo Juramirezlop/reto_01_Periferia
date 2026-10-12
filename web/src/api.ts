@@ -1,4 +1,4 @@
-// Tipos y llamadas al servidor.
+// Tipos y llamadas al servidor
 export type Lleno = { etiqueta: string; ruta: string; valor: unknown }
 export type PorConfirmar = Lleno & { confianza: number; nota: string }
 export type Faltante = { etiqueta: string; motivo: string }

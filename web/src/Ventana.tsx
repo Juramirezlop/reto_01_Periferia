@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-// Marco de ventana: barra con título y botones.
+// Marco de ventana
 export function Ventana(props: { titulo: string; clase: string; acciones?: ReactNode; children: ReactNode }) {
   return (
     <section className={`ventana ${props.clase}`}>

@@ -22,7 +22,7 @@ Bun.serve({
       return json({ ok: true, modelo: config.modelo, clave: Boolean(config.apiKey), fecha: fechaEjecucion() })
     }
 
-    // Vista del caso para el panel, calculada con las herramientas (sin modelo).
+    // Vista del caso para el panel
     const rutaCaso = pathname.match(/^\/api\/caso\/([^/]+)$/)
     if (rutaCaso) {
       const ctx = { directory: process.cwd(), sessionId: "panel" }
@@ -34,9 +34,9 @@ Bun.serve({
       const mapeo = JSON.parse(await ejecutar("proveedor_mapear_campos", { caso: caso.data, campos: etiquetas }, ctx, false))
       const estado = await Bun.file(join(rutaOutCaso(ctx, caso.data), "estado.json")).json().catch(() => null)
       const todos = await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: rutaOutCaso(ctx, caso.data) })).catch(() => [] as string[])
-      // Se listan los archivos generados, no los registros internos.
+      // Se listan los archivos generados, no los registros internos
       const archivos = todos.map((a) => a.replaceAll("\\", "/")).filter((a) => !a.endsWith("log.jsonl") && a !== "estado.json").sort()
-      // Un estado calculado con otra fecha ya no es confiable.
+      // Un estado calculado con otra fecha ya no es confiable
       const obsoleto = estado !== null && estado.fecha !== fechaEjecucion()
       return json({ solicitud: leida.data, mapeo: mapeo.data, estado, obsoleto, archivos })
     }

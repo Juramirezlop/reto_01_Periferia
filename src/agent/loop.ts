@@ -3,18 +3,17 @@ import type { Ctx } from "../../modulo/tools/util"
 import { declaraciones, ejecutar } from "./herramientas"
 import { confirmaEnvio } from "./sistema"
 
-// Último texto del agente (para entender un "sí" de la analista).
+// Entendimiento de analista y confirmación
 const ultimoTextoDelAgente = (historial: Entrada[]) =>
   [...historial].reverse().find((e): e is Extract<Entrada, { tipo: "modelo" }> => e.tipo === "modelo" && e.texto !== "")?.texto ?? ""
 
 export type Resultado = { respuesta: string; herramientas: { nombre: string; ok: boolean }[]; tokens?: number }
 
-// Estado de una conversación: lo dicho y lo gastado.
+// Estado de una conversación
 export type Sesion = { historial: Entrada[]; tokens: number }
 export type Limites = { maxPasos: number; maxTokens: number }
 
-// Un turno del agente: modelo -> herramientas -> modelo, hasta dar la respuesta.
-// `adaptadores` va en orden: el primero es el principal y los demás, respaldo.
+// Funcionalidad de chat por turnos
 export async function responder(opciones: {
   adaptadores: Adaptador[]
   sistema: string
@@ -34,7 +33,7 @@ export async function responder(opciones: {
     if (sesion.tokens >= limites.maxTokens) {
       return { respuesta: "Esta conversación alcanzó su límite de uso. Pulsa ↺ para empezar una nueva.", herramientas: usadas, tokens: sesion.tokens }
     }
-    // Prueba cada modelo hasta que uno responda.
+    // Prueba cada modelo hasta que uno responda
     let respuesta
     let ultimoError = "sin modelos configurados"
     for (const adaptador of adaptadores) {
@@ -55,7 +54,7 @@ export async function responder(opciones: {
     if (respuesta.llamadas.length === 0) return { respuesta: respuesta.texto, herramientas: usadas, tokens: sesion.tokens }
 
     for (const llamada of respuesta.llamadas) {
-      // Si el modelo repite la misma llamada, se reutiliza el resultado.
+      // Si el modelo repite la misma llamada, se reutiliza el resultado
       const clave = `${llamada.nombre}:${JSON.stringify(llamada.args)}`
       const contenido = yaEjecutadas.get(clave) ?? (await ejecutar(llamada.nombre, llamada.args, ctx, confirmo))
       yaEjecutadas.set(clave, contenido)

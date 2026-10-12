@@ -5,7 +5,7 @@ import PDFDocument from "pdfkit"
 import type { Campo } from "./datos"
 import type { Mapeo } from "./mapeo"
 
-// Convierte un valor del maestro en lo que se escribe en el formulario.
+// Convierte un valor del maestro en lo que se escribe en el formulario
 export function textoValor(valor: unknown): string {
   if (valor === undefined || valor === null) return ""
   if (typeof valor === "boolean") return valor ? "Sí" : "No"
@@ -13,9 +13,9 @@ export function textoValor(valor: unknown): string {
   return String(valor)
 }
 
-// ---------- Excel (P0) ----------
+// ---------- Excel ----------
 
-// Escribe cada etiqueta y valor en la celda exacta de la plantilla.
+// Escribe cada etiqueta y valor en la celda exacta de la plantilla
 export async function generarXlsx(campos: Campo[], valores: Map<string, unknown>, ruta: string): Promise<void> {
   const libro = new ExcelJS.Workbook()
 
@@ -27,7 +27,7 @@ export async function generarXlsx(campos: Campo[], valores: Map<string, unknown>
     celdaEtiqueta.value = campo.etiqueta
     celdaEtiqueta.font = { bold: true }
 
-    // Número como número, lo demás como texto; sin valor, celda vacía.
+    // Número como número, lo demás como texto
     const valor = valores.get(campo.etiqueta)
     hoja.getCell(campo.celda_valor).value = typeof valor === "number" ? valor : textoValor(valor) || null
 
@@ -39,9 +39,9 @@ export async function generarXlsx(campos: Campo[], valores: Map<string, unknown>
   await libro.xlsx.writeFile(ruta)
 }
 
-// ---------- PDF (P1) ----------
+// ---------- PDF ----------
 
-// PDF generado: una línea por campo, en el orden de la plantilla.
+// PDF generado
 export function generarPdf(
   titulo: string,
   campos: Campo[],
@@ -73,7 +73,7 @@ export function generarPdf(
   })
 }
 
-// ---------- Portal web (P2): solo deja los valores para copiar ----------
+// ---------- Portal web ----------
 
 export async function generarValoresPortal(
   cliente: string,

@@ -1,4 +1,4 @@
-// Las 5 herramientas del agente (nombre: proveedor_<export>). No exportar nada más.
+// Las 5 herramientas del agente
 import { existsSync } from "node:fs"
 import { copyFile, mkdir, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -30,7 +30,7 @@ import {
 
 // ---------- Piezas internas compartidas ----------
 
-// Carga el caso y recalcula el mapeo desde los archivos (el modelo no aporta valores).
+// Carga el caso y recalcula el mapeo desde los archivos
 async function prepararCaso(ctx: Ctx, caso: string) {
   const datos = await cargarCaso(ctx, caso)
   const [maestro, glosario] = await Promise.all([cargarMaestro(ctx), cargarGlosario(ctx)])
@@ -40,7 +40,7 @@ async function prepararCaso(ctx: Ctx, caso: string) {
 
 type FormularioCreado = { ruta: string; formato: "xlsx" | "pdf" | "portal"; archivo: string; aviso?: string }
 
-// Crea out/<caso>/formulario.<ext> (o valores-portal.md) según el formato pedido.
+// Crea la salida según el formato pedido.
 async function crearFormulario(ctx: Ctx, caso: string, datos: CasoCargado, maestro: Maestro, mapeo: Mapeo): Promise<FormularioCreado> {
   const carpeta = rutaOutCaso(ctx, caso)
   await mkdir(carpeta, { recursive: true })
@@ -73,7 +73,7 @@ type EstadoSoporte = {
   detalle: string
 }
 
-// Revisa cada soporte exigido contra el índice y la fecha de ejecución (RN3).
+// Revisa cada soporte exigido contra el índice y la fecha de ejecución
 async function revisarSoportes(ctx: Ctx, exigidos: string[], hoy: string): Promise<EstadoSoporte[]> {
   const indice = await cargarIndiceSoportes(ctx)
   const carpeta = rutasBase(ctx).soportes
@@ -84,7 +84,7 @@ async function revisarSoportes(ctx: Ctx, exigidos: string[], hoy: string): Promi
     if (!existsSync(join(carpeta, soporte.archivo))) {
       return { tipo, estado: "ausente", archivo: soporte.archivo, detalle: `El índice lo lista, pero falta el archivo ${soporte.archivo}.` }
     }
-    // Las fechas ISO se comparan como texto.
+    // Las fechas ISO se comparan como texto
     if (soporte.vigencia_hasta !== null && soporte.vigencia_hasta < hoy) {
       return { tipo, estado: "vencido", archivo: soporte.archivo, vigencia_hasta: soporte.vigencia_hasta, detalle: `Venció el ${soporte.vigencia_hasta}; hay que actualizarlo.` }
     }
@@ -105,7 +105,7 @@ const EsquemaEstadoPaquete = z.object({
   fecha: z.string().optional(), // fecha con la que se calculó el estado
 })
 
-// ---------- Herramienta 1 (HU-1): leer la solicitud ----------
+// ---------- Herramienta 1 ----------
 
 export const leer_solicitud = definirHerramienta({
   nombre: "proveedor_leer_solicitud",
@@ -133,7 +133,7 @@ export const leer_solicitud = definirHerramienta({
   },
 })
 
-// ---------- Herramienta 2 (HU-2): mapear campos al maestro ----------
+// ---------- Herramienta 2 (mapeo)  ----------
 
 export const mapear_campos = definirHerramienta({
   nombre: "proveedor_mapear_campos",
@@ -155,7 +155,7 @@ export const mapear_campos = definirHerramienta({
   },
 })
 
-// ---------- Herramienta 3 (HU-3): generar el formulario ----------
+// ---------- Herramienta 3 (formularios) ----------
 
 export const generar_formulario = definirHerramienta({
   nombre: "proveedor_generar_formulario",
@@ -176,7 +176,7 @@ export const generar_formulario = definirHerramienta({
   },
 })
 
-// ---------- Herramienta 4 (HU-4): armar el paquete para firma ----------
+// ---------- Herramienta 4 (paquete) ----------
 
 export const armar_paquete = definirHerramienta({
   nombre: "proveedor_armar_paquete",
@@ -188,11 +188,11 @@ export const armar_paquete = definirHerramienta({
     const solicitud = await cargarSolicitud(ctx, caso)
     const exigidos = await cargarSoportesExigidos(ctx, caso)
     const maestro = await cargarMaestro(ctx)
-    // Portal: no hay formulario que firmar; la analista carga todo en la web.
+    // Portal: no hay formulario que firmar, la analista carga todo en la web
     const esPortal = solicitud.formato === "portal"
     const etapa = esPortal ? "carga en portal" : "firma"
 
-    // Plantilla dañada: se arma lo demás y se avisa (HU-5).
+    // Plantilla dañada: se arma lo demás y se avisa
     let formulario: FormularioCreado | undefined
     let errorFormulario: string | undefined
     let mapeo: Mapeo = { llenos: [], faltantes: [], requiere_confirmacion: [] }
@@ -207,7 +207,7 @@ export const armar_paquete = definirHerramienta({
 
     const soportes = await revisarSoportes(ctx, exigidos, hoy)
 
-    // Vencido o ausente bloquea; un campo faltante no (RN3).
+    // Vencido o ausente bloquea, un campo faltante no
     const bloqueos: string[] = []
     if (errorFormulario) bloqueos.push(`Formulario no generado: ${errorFormulario}`)
     for (const s of soportes) {
@@ -216,7 +216,7 @@ export const armar_paquete = definirHerramienta({
     }
     const listo = bloqueos.length === 0
 
-    // Carpeta del paquete limpia en cada ejecución.
+    // Carpeta del paquete limpia en cada ejecución
     const carpetaCaso = rutaOutCaso(ctx, caso)
     const carpetaPaquete = join(carpetaCaso, "paquete")
     await rm(carpetaPaquete, { recursive: true, force: true })
@@ -265,11 +265,11 @@ export const armar_paquete = definirHerramienta({
     ].join("\n")
     await writeFile(join(carpetaPaquete, "checklist.md"), checklist, "utf8")
 
-    // borrador-correo.md (sin datos bancarios, RN2)
+    // borrador-correo.md (sin datos bancarios)
     const firmante = String(obtenerPorRuta(maestro, "representante_legal.nombre") ?? "")
     const cargo = String(obtenerPorRuta(maestro, "representante_legal.cargo") ?? "")
     const razonSocial = String(obtenerPorRuta(maestro, "razon_social") ?? "")
-    // Portal: valores-portal.md es interno, no se adjunta.
+    // Portal: valores-portal.md es interno
     const soportesPresentes = soportes.filter((s) => s.estado === "presente").map((s) => s.archivo)
     const adjuntos = [esPortal ? undefined : formulario?.archivo, ...soportesPresentes].filter((a): a is string => Boolean(a))
     const aviso = [
@@ -320,7 +320,7 @@ export const armar_paquete = definirHerramienta({
   },
 })
 
-// ---------- Herramienta 5 (RN4): simular el envío ----------
+// ---------- Herramienta 5 (simulación) ----------
 
 export const simular_envio = definirHerramienta({
   nombre: "proveedor_simular_envio",
@@ -342,7 +342,7 @@ export const simular_envio = definirHerramienta({
     }
     const estado = await leerJson(join(carpetaCaso, "estado.json"), EsquemaEstadoPaquete, `out/${caso}/estado.json`)
 
-    // Se envían formulario y soportes; checklist, borrador y valores de portal son internos.
+    // Se envían formulario y soportes
     const internos = ["checklist.md", "borrador-correo.md", "valores-portal.md"]
     const adjuntos = (await readdir(join(carpetaCaso, "paquete"))).filter((f) => !internos.includes(f)).sort()
 
